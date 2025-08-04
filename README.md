@@ -1,8 +1,4 @@
-Perfeito! Abaixo está o **README.md completo** em **Markdown puro**, com estrutura correta, títulos, listas, blocos de código e seções bem organizadas — pronto para você colar no seu repositório `Estufa-IoT`.
 
----
-
-````markdown
 # 🌱 Estufa-IoT
 
 O **Estufa-IoT** é um projeto de demonstração que simula um sistema IoT para coleta e visualização de dados.
@@ -32,7 +28,6 @@ Estufa-IoT
     └── ...
 ````
 
----
 
 ## ⚙️ Tecnologias Utilizadas
 
@@ -77,7 +72,6 @@ npm start
 
 > Acesse: [http://localhost:3000](http://localhost:3000)
 
----
 
 ## 🔄 Fluxo de Funcionamento
 
@@ -88,8 +82,6 @@ npm start
         ↓
 [ React (frontend) ] → Consome a API e exibe os dados na interface
 ```
-
----
 
 ## 📦 (Opcional) Empacotar o Frontend com Podman
 
