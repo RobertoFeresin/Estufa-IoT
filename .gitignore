@@ -1,0 +1,36 @@
+# Logs
+*.log
+*.out
+*.err
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# InfluxDB data (binários do banco)
+data/data/
+data/meta/
+data/wal/
+
+# Arquivos exportados (podem ser gerados de novo)
+data/exports/*.csv
+
+# Podman / Docker
+*.pid
+*.sock
+
+# Sistema
+.DS_Store
+Thumbs.db
+

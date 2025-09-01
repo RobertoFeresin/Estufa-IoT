@@ -1,122 +1,87 @@
 
-# 🌱 Estufa-IoT
 
-O **Estufa-IoT** é um projeto de demonstração que simula um sistema IoT para coleta e visualização de dados.
+## 🛠️ Ferramentas Utilizadas
 
-Ele é composto por dois serviços:
-
-- **🔧 Backend**: API em Node.js (Express) com SQLite e Python para geração dos dados, empacotada com Podman.
-- **💻 Frontend**: Interface em React que consome os dados da API e exibe em uma tabela.
+- **Podman** → gerencia os containers  
+- **InfluxDB** → banco de dados para séries temporais  
+- **Flask (Python)** → backend simulando sensores, exportando API e CSV  
+- **Nginx** → servidor web do frontend em produção  
+- **Vite (Node.js)** → ambiente de desenvolvimento do frontend  
+- **VSCode** → usado como editor, abrindo CSV exportados ou explorando via extensões  
 
 ---
 
-## 📁 Estrutura do Projeto
+## ⚡ Fluxo de Funcionamento
 
-```plaintext
-Estufa-IoT
-├── backend
-│   ├── Dockerfile           # Dockerfile para o backend
-│   ├── server.js            # Servidor Express
-│   ├── script.coleta.py     # Script Python que popula o banco
-│   ├── dados_imagem.db      # Banco SQLite (opcional, pode ser gerado)
-│   ├── package.json         # Dependências do backend
-│   └── ...
-└── frontend
-    ├── src/                 # Código React
-    ├── public/              # Arquivos estáticos
-    ├── package.json         # Dependências do frontend
-    └── ...
+1. O **InfluxDB** roda em um container e armazena dados de séries temporais.  
+2. O **Backend Flask** roda em outro container:  
+   - Simula sensores de **temperatura** e **umidade**  
+   - Escreve esses dados no InfluxDB  
+   - Disponibiliza endpoints (`/dados`, `/analise`, `/series`, `/chat`, `/export.csv`)  
+3. O **Frontend** (HTML/JS) roda via **Nginx**:  
+   - Consome os dados da API  
+   - Mostra gráficos, tabelas e chatbot  
+4. O usuário pode **exportar dados em CSV** e abrir no VSCode.  
+
+---
+
+## ▶️ Como Rodar
+
+### 1. Pré-requisitos
+- Podman instalado
+- Node.js 20+ (para rodar `npm run dev` ou `npm run build`)
+
+### 2. Script automático
+Na raiz do projeto:
+```bash
+chmod +x reset.sh
+./reset.sh
 ````
 
+Esse script:
 
-## ⚙️ Tecnologias Utilizadas
+* Remove containers e imagens antigas
+* Rebuilda o backend
+* Recria a rede
+* Sobe InfluxDB, Backend e Frontend
 
-| Componente | Tecnologias                        |
-| ---------- | ---------------------------------- |
-| Backend    | Node.js, Express, SQLite, Python 3 |
-| Frontend   | React, Axios                       |
-| Containers | Podman (alternativa ao Docker)     |
+### 3. URLs de acesso
 
----
-
-## 🚀 Como Executar o Projeto
-
-### 🔽 1. Clone o repositório
-
-```bash
-git clone git@github.com:RobertoFeresin/Estufa-IoT.git
-cd Estufa-IoT
-```
+* **Backend API** → [http://localhost:5000/dados](http://localhost:5000/dados)
+* **Frontend (site)** → [http://localhost:8081](http://localhost:8081)
+* **InfluxDB (ping)** → [http://localhost:8086/ping](http://localhost:8086/ping)
 
 ---
 
-### 🐍 2. Rodar o Backend com Podman
+## 📊 Endpoints Backend
 
-```bash
-cd backend
-podman build -t estufa-backend .
-podman run -p 3001:3001 estufa-backend
-```
-
-> A API estará acessível em: [http://localhost:3001/dados](http://localhost:3001/dados)
+* `/dados` → últimos registros
+* `/series` → séries para gráficos
+* `/analise` → estatísticas básicas
+* `/seed` (POST) → gera dados de teste
+* `/export.csv` → exporta para CSV
+* `/chat/<mensagem>` → chatbot simples
 
 ---
 
-### 💻 3. Rodar o Frontend em modo de desenvolvimento
+## 📦 Desenvolvimento Frontend
+
+Dentro da pasta `frontend`:
 
 ```bash
-cd ../frontend
 npm install
-npm start
+npm run dev     # ambiente de desenvolvimento
+npm run build   # gera ./dist para produção
 ```
 
-> Acesse: [http://localhost:3000](http://localhost:3000)
-
-
-## 🔄 Fluxo de Funcionamento
-
-```plaintext
-[ script.coleta.py ] → Gera banco SQLite com dados simulados
-        ↓
-[ server.js ] → Exposição da API REST /dados
-        ↓
-[ React (frontend) ] → Consome a API e exibe os dados na interface
-```
-
-## 📦 (Opcional) Empacotar o Frontend com Podman
-
-```bash
-cd frontend
-npm run build
-podman build -t estufa-frontend .
-podman run -p 3000:80 estufa-frontend
-```
-
-> Interface acessível em: [http://localhost:3000](http://localhost:3000)
+Produção é servida pelo Nginx no container (porta 8081).
 
 ---
 
-## ✨ Melhorias Futuras
+## 📌 Observação
 
-* ✅ Implementar OCR real com Tesseract para leitura de texto de imagem
-* ✅ Orquestração com `podman-compose`
-* ✅ Autenticação de usuários
-* ✅ Dashboard com gráficos e dados dinâmicos
-* ✅ Deploy em ambientes externos (Render, Railway, VPS, etc.)
-
----
-
-## 👤 Autor
-
-**Roberto Tini de Azevedo Feresin**
-📍 São Paulo - SP
-📬 [robertoferesin12@gmail.com](mailto:robertoferesin12@gmail.com)
-🌐 [github.com/RobertoFeresin](https://github.com/RobertoFeresin)
-
----
-
-## 📄 Licença
-
-Este projeto é livre para fins educacionais e demonstrativos.
+* Este projeto é **acadêmico** e não deve ser usado em produção.
+* O InfluxDB salva arquivos binários em `data/` → estes são **ignorados no Git**.
+* Apenas o código fonte e scripts são versionados.
 
 
