@@ -1,4 +1,4 @@
-const API = "http://localhost:5000";
+const API = `${window.location.protocol}//${window.location.hostname}:5000`;
 
 const els = {
   graf: null,
