@@ -28,13 +28,13 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(tick, 5000);
 });
 
-async function seedar(){
+async function seedar() {
   try {
     await fetch(`${API}/seed?n=40&interval_ms=120`, { method: "POST" });
   } catch {}
 }
 
-function setupChart(){
+function setupChart() {
   const ctx = document.getElementById("grafico").getContext("2d");
   els.graf = new Chart(ctx, {
     type: "line",
@@ -50,20 +50,18 @@ function setupChart(){
   });
 }
 
-async function tick(){
+async function tick() {
   try {
     const [s, a] = await Promise.all([
       fetch(`${API}/series?limit=200`).then(r=>r.json()),
       fetch(`${API}/analise?limit=200`).then(r=>r.json())
     ]);
 
-    // Update chart
     els.graf.data.labels = s.time;
     els.graf.data.datasets[0].data = s.temperatura;
     els.graf.data.datasets[1].data = s.umidade;
     els.graf.update();
 
-    // Update table (últimos 30, mais recentes em cima)
     const dados = (await fetch(`${API}/dados?limit=30`).then(r=>r.json())).reverse();
     els.tbody.innerHTML = dados.map(p => `
       <tr>
@@ -73,25 +71,105 @@ async function tick(){
       </tr>
     `).join("");
 
-    // Stats
     els.mediaT.textContent = a.temperatura?.media ? a.temperatura.media.toFixed(2) : "—";
     els.mediaU.textContent = a.umidade?.media ? a.umidade.media.toFixed(2) : "—";
 
   } catch (e) {
-    // Silencia para demo
+    // ignora erros para demo
   }
 }
 
-async function enviarChat(){
+// =========================
+// 🔥 Chat IA Local (Ollama) + CSV Inteligente
+// =========================
+// Atualize a função enviarChat() para usar as novas classes:
+
+async function enviarChat() {
   const m = els.chatInput.value.trim();
-  if(!m) return;
-  els.chatBox.innerHTML += `<div><b>Você:</b> ${m}</div>`;
-  try {
-    const r = await fetch(`${API}/chat/${encodeURIComponent(m)}`).then(r=>r.json());
-    els.chatBox.innerHTML += `<div><b>Bot:</b> ${r.resposta}</div>`;
-  } catch {
-    els.chatBox.innerHTML += `<div><b>Bot:</b> erro ao responder</div>`;
-  }
+  if (!m) return;
+
+  // Exibe mensagem do usuário (direita)
+  const userMessage = document.createElement('div');
+  userMessage.className = 'message user-message';
+  userMessage.textContent = m;
+  els.chatBox.appendChild(userMessage);
+  
   els.chatInput.value = "";
   els.chatBox.scrollTop = els.chatBox.scrollHeight;
+
+  // Indicador "digitando..." (esquerda)
+  const thinking = document.createElement('div');
+  thinking.className = 'typing-indicator';
+  thinking.innerHTML = `
+    <div class="typing-text">Digitando</div>
+    <div class="typing-dots">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  `;
+  els.chatBox.appendChild(thinking);
+  els.chatBox.scrollTop = els.chatBox.scrollHeight;
+
+  els.chatInput.disabled = true;
+  els.btnChat.disabled = true;
+
+  try {
+    // 🧠 Intercepta mensagens que pedem dados ou exportação
+    if (/\b(csv|exportar|baixar|dados|arquivo|relatório)\b/i.test(m)) {
+      thinking.remove();
+      const botMessage = document.createElement('div');
+      botMessage.className = 'message bot-message';
+      botMessage.innerHTML = `
+        📊 Tudo pronto! Você pode baixar os dados da estufa clicando no botão abaixo:<br><br>
+        <a href="${API}/export.csv" class="btn-download" target="_blank" rel="noopener">⬇️ Baixar CSV</a>
+      `;
+      els.chatBox.appendChild(botMessage);
+      els.chatBox.scrollTop = els.chatBox.scrollHeight;
+      return;
+    }
+
+    // 🤖 Chamada para a IA local
+    const res = await fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "qwen2:1.5b",
+        stream: false,
+        messages: [
+          { 
+            role: "system", 
+            content: "Você é um assistente técnico da Estufa IoT. Responda de forma clara, concisa e sempre em português do Brasil." 
+          },
+          { role: "user", content: m }
+        ]
+      })
+    });
+
+    if (!res.ok) throw new Error("Erro na requisição");
+    const data = await res.json();
+
+    const resposta = (data.message?.content || data.response || "Sem resposta.")
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}]/gu, '')
+      .trim();
+
+    thinking.remove();
+    const botMessage = document.createElement('div');
+    botMessage.className = 'message bot-message';
+    botMessage.textContent = resposta;
+    els.chatBox.appendChild(botMessage);
+    
+  } catch (err) {
+    console.error(err);
+    thinking.remove();
+    const errorMessage = document.createElement('div');
+    errorMessage.className = 'message bot-message';
+    errorMessage.textContent = '❌ Erro ao conectar com a IA local.';
+    els.chatBox.appendChild(errorMessage);
+  } finally {
+    els.chatInput.disabled = false;
+    els.btnChat.disabled = false;
+    els.chatBox.scrollTop = els.chatBox.scrollHeight;
+    els.chatInput.focus();
+  }
 }

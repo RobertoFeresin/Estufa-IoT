@@ -1,6 +1,6 @@
 import os
 import threading
-from flask import Flask, jsonify, send_file, request
+from flask import Flask, jsonify, send_file, request, send_from_directory
 from flask_cors import CORS
 import influx_reader
 import influx_writer
@@ -66,6 +66,14 @@ def maybe_start_simulation():
             "host": INFLUX_HOST, "db": INFLUX_DB, "interval_s": 3
         }, daemon=True)
         th.start()
+
+@app.route("/")
+def index():
+    return send_from_directory("../frontend", "index.html")
+
+@app.route("/<path:path>")
+def static_proxy(path):
+    return send_from_directory("../frontend", path)
 
 if __name__ == "__main__":
     maybe_start_simulation()

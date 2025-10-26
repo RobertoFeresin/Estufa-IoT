@@ -12,42 +12,19 @@
   <header class="topbar">
     <div class="container">
       <div class="brand">Estufa <span>IoT</span></div>
-      <nav class="nav">
-        <a href="#home">Início</a>
-        <a href="#recursos">Recursos</a>
-        <a href="#dashboard">Dashboard</a>
-      </nav>
     </div>
   </header>
 
-  <section id="home" class="hero">
-    <div class="container">
-      <h1>Monitoramento de Estufa 🌱</h1>
-      <p>Protótipo acadêmico com dados em tempo real, análise básica e exportação.</p>
-      <div class="actions">
-        <button id="btnSeed">Gerar dados de teste</button>
-        <a class="secondary" href="http://localhost:5000/export.csv" target="_blank" rel="noopener">Baixar CSV</a>
-      </div>
+<section id="home" class="hero" style="display:none;">
+  <div class="container">
+    <div class="actions">
+      <button id="btnSeed">Gerar dados de teste</button>
+      <a class="secondary" href="http://localhost:5000/export.csv" target="_blank" rel="noopener">Baixar CSV</a>
     </div>
-  </section>
+  </div>
+</section>
 
-  <section id="recursos" class="features">
-    <div class="container grid">
-      <div class="card">
-        <h3>Time Series</h3>
-        <p>Armazenamento otimizado no InfluxDB (dados por tempo).</p>
-      </div>
-      <div class="card">
-        <h3>API Flask</h3>
-        <p>Endpoints simples: /dados, /series, /analise, /seed, /export.csv.</p>
-      </div>
-      <div class="card">
-        <h3>Frontend</h3>
-        <p>Gráficos, tabela e chatbot básico para interação.</p>
-      </div>
-    </div>
-  </section>
-
+  
   <section id="dashboard" class="dashboard">
     <div class="container grid-2">
       <div class="panel">

@@ -7,6 +7,15 @@ podman rm -af || true
 echo "🧹 Limpando imagens antigas..."
 podman rmi -af || true
 
+echo "🔪 Matando qualquer processo ocupando a porta 11434..."
+if sudo lsof -t -i:11434 >/dev/null 2>&1; then
+  sudo fuser -k 11434/tcp || true
+  echo "✅ Porta 11434 liberada!"
+else
+  echo "ℹ️ Nenhum processo usando a porta 11434."
+fi
+
+
 echo "🔨 Rebuildando backend..."
 podman build -t estufa-backend .
 
@@ -42,8 +51,51 @@ else
     docker.io/library/nginx:alpine
 fi
 
+echo "🤖 Subindo Ollama (IA local)..."
+
+if podman ps -a --format '{{.Names}}' | grep -q '^ollama$'; then
+  podman stop ollama >/dev/null 2>&1 || true
+  podman rm ollama >/dev/null 2>&1 || true
+fi
+if podman volume exists ollama; then
+  echo "🧨 Removendo volume antigo do Ollama..."
+  podman volume rm ollama >/dev/null 2>&1 || true
+fi
+
+podman pull docker.io/ollama/ollama:latest
+
+podman run -d \
+  --name ollama \
+  --network estufa-net \
+  -p 11434:11434 \
+  -e HOME=/root \
+  -v ollama:/root/.ollama \
+  docker.io/ollama/ollama:latest
+
+echo "⏳ Aguardando Ollama iniciar..."
+sleep 6
+
+if curl -s http://localhost:11434 | grep -q "Ollama is running"; then
+  echo "✅ Ollama está rodando corretamente."
+else
+  echo "❌ Falha ao iniciar Ollama. Verifique o Podman."
+  exit 1
+fi
+
+echo "📦 Baixando modelo leve 'qwen2:1.5b'..."
+podman exec -it ollama ollama pull qwen2:1.5b || {
+  echo "⚠️ Falha ao puxar modelo automaticamente. Tente manualmente depois com:"
+  echo "   podman exec -it ollama ollama pull qwen2:1.5b"
+}
+
+echo "📋 Modelos disponíveis:"
+podman exec -it ollama ollama list || true
+
 echo ""
-echo "✅ Todos os serviços foram iniciados!"
+echo "✅ Todos os serviços foram iniciados com sucesso!"
 echo "➡️  Backend:   http://localhost:5000/dados"
 echo "➡️  Frontend:  http://localhost:8081"
 echo "➡️  InfluxDB:  http://localhost:8086/ping"
+echo "➡️  IA (Ollama): http://localhost:11434"
+echo ""
+echo "🎯 Modelo 'qwen2:1.5b' instalado e pronto pra responder no chat!"
