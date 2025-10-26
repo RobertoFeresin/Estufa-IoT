@@ -38,16 +38,121 @@ function setupChart() {
   const ctx = document.getElementById("grafico").getContext("2d");
   els.graf = new Chart(ctx, {
     type: "line",
-    data: { labels: [], datasets: [
-      { label: "Temperatura (°C)", data: [], borderWidth: 2, fill: false },
-      { label: "Umidade (%)", data: [], borderWidth: 2, fill: false }
-    ]},
+    data: { 
+      labels: [], 
+      datasets: [
+        { 
+          label: "Temperatura (°C)", 
+          data: [], 
+          borderWidth: 3, 
+          fill: false,
+          borderColor: '#5dd39e',
+          backgroundColor: 'rgba(93, 211, 158, 0.1)',
+          tension: 0.4,
+          pointBackgroundColor: '#5dd39e',
+          pointBorderColor: '#0b0c0f',
+          pointBorderWidth: 2
+        },
+        { 
+          label: "Umidade (%)", 
+          data: [], 
+          borderWidth: 3, 
+          fill: false,
+          borderColor: '#4d8be6',
+          backgroundColor: 'rgba(77, 139, 230, 0.1)',
+          tension: 0.4,
+          pointBackgroundColor: '#4d8be6',
+          pointBorderColor: '#0b0c0f',
+          pointBorderWidth: 2
+        }
+      ]
+    },
     options: {
       animation: false,
       responsive: true,
-      scales: { x: { display: false } }
+      scales: { 
+        x: { 
+          display: true,
+          grid: {
+            color: 'rgba(93, 211, 158, 0.15)',
+            drawBorder: true,
+            borderColor: 'rgba(93, 211, 158, 0.4)'
+          },
+          ticks: {
+            color: 'rgba(233, 234, 238, 0.8)',
+            maxTicksLimit: 8,
+            // Rotacionar os labels se necessário
+            maxRotation: 45,
+            minRotation: 45
+          },
+          title: {
+            display: true,
+            text: 'Data e Hora',
+            color: 'rgba(233, 234, 238, 0.8)'
+          }
+        },
+        y: {
+          grid: {
+            color: 'rgba(93, 211, 158, 0.15)',
+            drawBorder: true,
+            borderColor: 'rgba(93, 211, 158, 0.4)'
+          },
+          ticks: {
+            color: 'rgba(233, 234, 238, 0.8)',
+            maxTicksLimit: 8
+          },
+          title: {
+            display: true,
+            text: 'Valores',
+            color: 'rgba(233, 234, 238, 0.8)'
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: {
+            color: 'rgba(233, 234, 238, 0.9)',
+            usePointStyle: true,
+            padding: 20
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(23, 24, 29, 0.95)',
+          titleColor: '#5dd39e',
+          bodyColor: '#e9eaee',
+          borderColor: '#5dd39e',
+          borderWidth: 1,
+          // Formatar tooltip também
+          callbacks: {
+            title: function(context) {
+              const index = context[0].dataIndex;
+              const originalTime = context[0].dataset.data[index]?.time || '';
+              return formatDateTimeDetailed(originalTime);
+            }
+          }
+        }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      }
     }
   });
+}
+
+// Função mais detalhada para o tooltip
+function formatDateTimeDetailed(isoString) {
+  if (!isoString) return '';
+  
+  const date = new Date(isoString);
+  
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  
+  return `${day}/${month} ${hours}:${minutes}:${seconds}`;
 }
 
 async function tick() {
@@ -57,7 +162,10 @@ async function tick() {
       fetch(`${API}/analise?limit=200`).then(r=>r.json())
     ]);
 
-    els.graf.data.labels = s.time;
+    // Formatar os horários para o gráfico
+    const formattedTimes = s.time.map(time => formatDateTime(time));
+    
+    els.graf.data.labels = formattedTimes;
     els.graf.data.datasets[0].data = s.temperatura;
     els.graf.data.datasets[1].data = s.umidade;
     els.graf.update();
@@ -65,7 +173,7 @@ async function tick() {
     const dados = (await fetch(`${API}/dados?limit=30`).then(r=>r.json())).reverse();
     els.tbody.innerHTML = dados.map(p => `
       <tr>
-        <td>${p.time}</td>
+        <td>${formatDateTime(p.time)}</td>
         <td>${p.temperatura.toFixed(2)}</td>
         <td>${p.umidade.toFixed(2)}</td>
       </tr>
@@ -78,6 +186,50 @@ async function tick() {
     // ignora erros para demo
   }
 }
+
+// Função para formatar data/hora
+// Função flexível para formatar data/hora
+function formatDateTime(isoString, format = 'short') {
+  if (!isoString) return '';
+  
+  const date = new Date(isoString);
+  
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  
+  switch(format) {
+    case 'short': // DD/MM HH:MM
+      return `${day}/${month} ${hours}:${minutes}`;
+    
+    case 'medium': // DD/MM HH:MM:SS
+      return `${day}/${month} ${hours}:${minutes}:${seconds}`;
+    
+    case 'time': // HH:MM:SS
+      return `${hours}:${minutes}:${seconds}`;
+    
+    case 'date': // DD/MM/AAAA
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    
+    default:
+      return `${day}/${month} ${hours}:${minutes}`;
+  }
+}
+
+// Na função tick(), use:
+const formattedTimes = s.time.map(time => formatDateTime(time, 'short'));
+
+// Na tabela, use:
+els.tbody.innerHTML = dados.map(p => `
+  <tr>
+    <td>${formatDateTime(p.time, 'medium')}</td>
+    <td>${p.temperatura.toFixed(2)}</td>
+    <td>${p.umidade.toFixed(2)}</td>
+  </tr>
+`).join("");
 
 // =========================
 // 🔥 Chat IA Local (Ollama) + CSV Inteligente
