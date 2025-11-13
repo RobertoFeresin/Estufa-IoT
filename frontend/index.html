@@ -1,67 +1,248 @@
 <!doctype html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Estufa IoT - Demo</title>
+  <title>GreenTech - Estufa IoT</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/style.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module" src="/script.js"></script>
 </head>
-<body>
-  <header class="topbar">
-    <div class="container">
-      <div class="brand">Estufa <span>IoT</span></div>
-    </div>
-  </header>
 
-<section id="home" class="hero" style="display:none;">
-  <div class="container">
-    <div class="actions">
-      <button id="btnSeed">Gerar dados de teste</button>
-      <a class="secondary" href="http://localhost:5000/export.csv" target="_blank" rel="noopener">Baixar CSV</a>
+<body>
+  <div id="loginModal" class="modal active">
+    <div class="modal-background"></div>
+    <div class="modal-content">
+      <div class="login-container">
+        <div class="login-header">
+          <img src="/img/Logo_GreenTechh_Fundo_Branco-removebg-preview.png" alt="GreenTech Logo" class="login-logo">
+          <h1>GreenTech IoT</h1>
+          <p>Sistema de Monitoramento de Estufa</p>
+        </div>
+        
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label for="username">Usuário</label>
+            <input type="text" id="username" name="username" placeholder="Digite seu usuário" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="password">Senha</label>
+            <input type="password" id="password" name="password" placeholder="Digite sua senha" required>
+          </div>
+          
+          <button type="submit" class="login-btn">
+            <span class="btn-text">Acessar Sistema</span>
+            <div class="btn-loader"></div>
+          </button>
+          
+          <div class="login-error" id="loginError"></div>
+        </form>
+        
+        <div class="login-footer">
+          <p>Demo Acadêmica - Sistema IoT</p>
+        </div>
+      </div>
     </div>
   </div>
-</section>
 
-  
-  <section id="dashboard" class="dashboard">
-    <div class="container grid-2">
-      <div class="panel">
-        <h2>Gráfico em tempo real</h2>
-        <canvas id="grafico"></canvas>
+  <div id="mainContent" class="main-content hidden">
+    <header class="topbar">
+      <div class="container">
+        <div class="brand">
+          <img src="/img/Logo_GreenTechh_Fundo_Branco-removebg-preview.png" alt="GreenTech" class="brand-logo">
+          <span>GreenTech <em>IoT</em></span>
+        </div>
+        <nav class="nav">
+          <button id="logoutBtn" class="logout-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="2"/>
+              <path d="M16 17l5-5-5-5" stroke="currentColor" stroke-width="2"/>
+              <path d="M21 12H9" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            Sair
+          </button>
+        </nav>
       </div>
+    </header>
 
-      <div class="panel">
-        <h2>Tabela (últimos dados)</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Horário (UTC)</th><th>Temp (°C)</th><th>Umid (%)</th></tr>
-            </thead>
-            <tbody id="tbody"></tbody>
-          </table>
+    <div id="connectionStatus" class="connection-status"></div>
+
+    <section class="dashboard">
+      <div class="container">
+        <div class="dashboard-header">
+          <h1>Painel de Controle da Estufa</h1>
+          <p>Monitoramento em tempo real das condições ambientais</p>
         </div>
 
-        <div class="stats">
-          <div><b>Temp média:</b> <span id="mediaT">—</span></div>
-          <div><b>Umid média:</b> <span id="mediaU">—</span></div>
+        <!-- Status Cards Superiores - Simplificados -->
+        <div class="status-cards-grid">
+          <div class="status-card">
+            <div class="status-icon temperature">🌡️</div>
+            <div class="status-info">
+              <div class="status-label">Temperatura</div>
+              <div class="status-value" id="currentTemp">--</div>
+              <div class="status-unit">°C</div>
+              <div class="status-trend" id="tempTrend">Estável</div>
+            </div>
+          </div>
+          
+          <div class="status-card">
+            <div class="status-icon humidity">💧</div>
+            <div class="status-info">
+              <div class="status-label">Umidade</div>
+              <div class="status-value" id="currentHumidity">--</div>
+              <div class="status-unit">%</div>
+              <div class="status-trend" id="humidityTrend">Estável</div>
+            </div>
+          </div>
+          
+          <div class="status-card">
+            <div class="status-icon light">💡</div>
+            <div class="status-info">
+              <div class="status-label">Luminosidade</div>
+              <div class="status-value" id="currentLight">--</div>
+              <div class="status-unit">lux</div>
+              <div class="status-trend" id="lightTrend">Estável</div>
+            </div>
+          </div>
+          
+          <div class="status-card">
+            <div class="status-icon water">💦</div>
+            <div class="status-info">
+              <div class="status-label">Nível Água</div>
+              <div class="status-value" id="currentWaterLevel">--</div>
+              <div class="status-unit">cm</div>
+              <div class="status-trend" id="waterTrend">Estável</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel chart-panel">
+            <div class="panel-header">
+              <h2>Gráficos em Tempo Real</h2>
+              <div class="chart-legends">
+                <div class="legend">
+                  <span class="legend-color temp-color"></span>
+                  <span>Temperatura (°C)</span>
+                </div>
+                <div class="legend">
+                  <span class="legend-color humidity-color"></span>
+                  <span>Umidade (%)</span>
+                </div>
+                <div class="legend">
+                  <span class="legend-color light-color"></span>
+                  <span>Luminosidade (lux)</span>
+                </div>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="grafico"></canvas>
+            </div>
+          </div>
+
+          <div class="panel data-panel">
+            <div class="panel-header">
+              <h2>Últimas Leituras</h2>
+              <span class="data-count" id="dataCount">20 registros</span>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Horário</th>
+                    <th>Sensor</th>
+                    <th>Temp</th>
+                    <th>Umid</th>
+                    <th>Luz</th>
+                    <th>Água</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody"></tbody>
+              </table>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon">🌡️</div>
+                <div class="stat-info">
+                  <div class="stat-label">Temp Média</div>
+                  <div class="stat-value" id="mediaT">—</div>
+                  <div class="stat-trend" id="tempMediaTrend">Estável</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">💧</div>
+                <div class="stat-info">
+                  <div class="stat-label">Umid Média</div>
+                  <div class="stat-value" id="mediaU">—</div>
+                  <div class="stat-trend" id="humidityMediaTrend">Estável</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">💡</div>
+                <div class="stat-info">
+                  <div class="stat-label">Luz Média</div>
+                  <div class="stat-value" id="mediaLight">—</div>
+                  <div class="stat-trend" id="lightMediaTrend">Estável</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">💦</div>
+                <div class="stat-info">
+                  <div class="stat-label">Água Média</div>
+                  <div class="stat-value" id="mediaWater">—</div>
+                  <div class="stat-trend" id="waterMediaTrend">Estável</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-section">
+          <div class="panel chat-panel">
+            <div class="panel-header">
+              <h2>Assistente de Cultivo</h2>
+              <div class="chat-status-indicator">
+                <span class="status-dot"></span>
+                <span>Online</span>
+              </div>
+            </div>
+            <div class="chat-container">
+              <div class="chat-box" id="chatBox">
+                <div class="welcome-message">
+                  <div class="bot-avatar">🌱</div>
+                  <div class="message-content">
+                    <div class="message-text">Olá! Sou seu assistente especializado em estufas. Posso ajudar com informações sobre temperatura, umidade, luminosidade, nível de água e condições ideais para cultivo.</div>
+                    <div class="message-time">Agora</div>
+                  </div>
+                </div>
+              </div>
+              <div class="chat-input-container">
+                <input type="text" id="chatInput" placeholder="Pergunte sobre as condições da estufa..." />
+                <button id="btnChat" class="send-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="container chat">
-      <h2>Chatbot</h2>
-      <div class="chat-box" id="chatBox"></div>
-      <div class="chat-actions">
-        <input id="chatInput" placeholder="Pergunte sobre temperatura, umidade ou export..." />
-        <button id="btnChat">Enviar</button>
+    <footer class="footer">
+      <div class="container">
+        <p>GreenTech IoT • Sistema de Monitoramento Inteligente</p>
+        <p>Demo Acadêmica - Desenvolvido para Estufas Sustentáveis</p>
       </div>
-    </div>
-  </section>
+    </footer>
+  </div>
 
-  <footer class="footer">
-    <div class="container">Demo acadêmica • Estufa IoT</div>
-  </footer>
+  <canvas id="liquidCanvas"></canvas>
 </body>
+
 </html>

@@ -1,6 +1,6 @@
 
 
-## 🛠️ Ferramentas Utilizadas
+## Ferramentas Utilizadas
 
 - **Podman** → gerencia os containers  
 - **InfluxDB** → banco de dados para séries temporais  
@@ -11,7 +11,7 @@
 
 ---
 
-## ⚡ Fluxo de Funcionamento
+## Fluxo de Funcionamento
 
 1. O **InfluxDB** roda em um container e armazena dados de séries temporais.  
 2. O **Backend Flask** roda em outro container:  
@@ -25,7 +25,7 @@
 
 ---
 
-## ▶️ Como Rodar
+## Como Rodar
 
 ### 1. Pré-requisitos
 - Podman instalado
@@ -53,7 +53,7 @@ Esse script:
 
 ---
 
-## 📊 Endpoints Backend
+## Endpoints Backend
 
 * `/dados` → últimos registros
 * `/series` → séries para gráficos
@@ -64,7 +64,7 @@ Esse script:
 
 ---
 
-## 📦 Desenvolvimento Frontend
+## Desenvolvimento Frontend
 
 Dentro da pasta `frontend`:
 
@@ -78,7 +78,7 @@ Produção é servida pelo Nginx no container (porta 8081).
 
 ---
 
-## 📌 Observação
+## Observação
 
 * Este projeto é **acadêmico** e não deve ser usado em produção.
 * O InfluxDB salva arquivos binários em `data/` → estes são **ignorados no Git**.

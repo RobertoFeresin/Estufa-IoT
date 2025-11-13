@@ -1,175 +1,718 @@
-const API = `${window.location.protocol}//${window.location.hostname}:5000`;
+const API = `http://${window.location.hostname}:5000`;
 
 const els = {
+  loginModal: document.getElementById('loginModal'),
+  mainContent: document.getElementById('mainContent'),
+  loginForm: document.getElementById('loginForm'),
+  loginError: document.getElementById('loginError'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  
+  currentTemp: document.getElementById('currentTemp'),
+  currentHumidity: document.getElementById('currentHumidity'),
+  currentLight: document.getElementById('currentLight'),
+  currentWaterLevel: document.getElementById('currentWaterLevel'),
+  tempTrend: document.getElementById('tempTrend'),
+  humidityTrend: document.getElementById('humidityTrend'),
+  lightTrend: document.getElementById('lightTrend'),
+  waterTrend: document.getElementById('waterTrend'),
+  
+  connectionStatus: document.getElementById('connectionStatus'),
+  dataCount: document.getElementById('dataCount'),
+  
   graf: null,
-  tbody: null,
-  mediaT: null,
-  mediaU: null,
-  chatInput: null,
-  chatBox: null,
-  btnChat: null,
-  btnSeed: null
+  tbody: document.getElementById("tbody"),
+  
+  mediaT: document.getElementById("mediaT"),
+  mediaU: document.getElementById("mediaU"),
+  mediaLight: document.getElementById("mediaLight"),
+  mediaWater: document.getElementById("mediaWater"),
+  tempMediaTrend: document.getElementById("tempMediaTrend"),
+  humidityMediaTrend: document.getElementById("humidityMediaTrend"),
+  lightMediaTrend: document.getElementById("lightMediaTrend"),
+  waterMediaTrend: document.getElementById("waterMediaTrend"),
+  
+  chatInput: document.getElementById("chatInput"),
+  chatBox: document.getElementById("chatBox"),
+  btnChat: document.getElementById("btnChat")
+};
+
+const state = {
+  systemReady: false,
+  connectionStatus: 'checking',
+  currentSessionId: null,
+  isAuthenticated: false,
+  previousData: null,
+  chartData: {
+    labels: [],
+    temperatura: [],
+    umidade: [],
+    luminosidade: [],
+    nivel_agua: []
+  },
+  estufaData: {
+    mediaTemperatura: 0,
+    mediaUmidade: 0,
+    mediaLuminosidade: 0,
+    mediaNivelAgua: 0,
+    lastUpdate: null,
+    totalRegistros: 0
+  }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  els.tbody = document.getElementById("tbody");
-  els.mediaT = document.getElementById("mediaT");
-  els.mediaU = document.getElementById("mediaU");
-  els.chatInput = document.getElementById("chatInput");
-  els.chatBox = document.getElementById("chatBox");
-  els.btnChat = document.getElementById("btnChat");
-  els.btnSeed = document.getElementById("btnSeed");
-
-  els.btnChat.addEventListener("click", enviarChat);
-  els.btnSeed.addEventListener("click", seedar);
-
-  setupChart();
-  tick();
-  setInterval(tick, 5000);
+  initializeApp();
 });
 
-async function seedar() {
-  try {
-    await fetch(`${API}/seed?n=40&interval_ms=120`, { method: "POST" });
-  } catch {}
+function initializeApp() {
+  setupEventListeners();
+  setupChart();
+  checkAuthentication();
+  initializeLiquidBackground();
 }
 
-function setupChart() {
-  const ctx = document.getElementById("grafico").getContext("2d");
-  els.graf = new Chart(ctx, {
-    type: "line",
-    data: { labels: [], datasets: [
-      { label: "Temperatura (°C)", data: [], borderWidth: 2, fill: false },
-      { label: "Umidade (%)", data: [], borderWidth: 2, fill: false }
-    ]},
-    options: {
-      animation: false,
-      responsive: true,
-      scales: { x: { display: false } }
+function setupEventListeners() {
+  els.loginForm.addEventListener('submit', handleLogin);
+  els.logoutBtn.addEventListener('click', handleLogout);
+  
+  els.btnChat.addEventListener('click', enviarChat);
+  els.chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      enviarChat();
     }
   });
 }
 
-async function tick() {
-  try {
-    const [s, a] = await Promise.all([
-      fetch(`${API}/series?limit=200`).then(r=>r.json()),
-      fetch(`${API}/analise?limit=200`).then(r=>r.json())
-    ]);
+function setupChart() {
+  const ctx = document.getElementById("grafico").getContext("2d");
+  
+  // Destruir gráfico existente se houver
+  if (window.existingChart) {
+    window.existingChart.destroy();
+  }
+  
+  els.graf = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        { 
+          label: "Temperatura (°C)", 
+          data: [], 
+          borderWidth: 3,
+          borderColor: '#00ff88',
+          backgroundColor: 'rgba(0, 255, 136, 0.1)',
+          fill: false,
+          tension: 0.4,
+          pointBackgroundColor: '#00ff88',
+          pointBorderColor: '#000',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          yAxisID: 'y'
+        },
+        { 
+          label: "Umidade (%)", 
+          data: [], 
+          borderWidth: 3,
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0, 212, 255, 0.1)',
+          fill: false,
+          tension: 0.4,
+          pointBackgroundColor: '#00d4ff',
+          pointBorderColor: '#000',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          yAxisID: 'y1'
+        },
+        { 
+          label: "Luminosidade (lux)", 
+          data: [], 
+          borderWidth: 2,
+          borderColor: '#fdcb6e',
+          backgroundColor: 'rgba(253, 203, 110, 0.1)',
+          fill: false,
+          tension: 0.4,
+          pointBackgroundColor: '#fdcb6e',
+          pointBorderColor: '#000',
+          pointBorderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: {
+      animation: {
+        duration: 1000,
+        easing: 'easeOutQuart'
+      },
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(26, 26, 26, 0.95)',
+          titleColor: '#fff',
+          bodyColor: '#fff',
+          borderColor: '#00ff88',
+          borderWidth: 1,
+          cornerRadius: 8,
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              if (context.parsed.y !== null) {
+                if (label.includes('Temperatura') || label.includes('Umidade')) {
+                  label += context.parsed.y.toFixed(1);
+                } else if (label.includes('Luminosidade')) {
+                  label += Math.round(context.parsed.y);
+                } else {
+                  label += context.parsed.y;
+                }
+              }
+              return label;
+            }
+          }
+        }
+      },
+      scales: { 
+        x: {
+          display: true,
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.7)',
+            maxRotation: 45
+          },
+          title: {
+            display: true,
+            text: 'Tempo',
+            color: 'rgba(255, 255, 255, 0.7)'
+          }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)',
+            drawBorder: false
+          },
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.7)'
+          },
+          title: {
+            display: true,
+            text: 'Temperatura (°C)',
+            color: '#00ff88'
+          }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          grid: {
+            drawOnChartArea: false,
+          },
+          ticks: {
+            color: 'rgba(255, 255, 255, 0.7)'
+          },
+          title: {
+            display: true,
+            text: 'Umidade (%)',
+            color: '#00d4ff'
+          }
+        },
+        y2: {
+          type: 'linear',
+          display: false,
+          position: 'right',
+          grid: {
+            drawOnChartArea: false,
+          }
+        }
+      }
+    }
+  });
+  
+  window.existingChart = els.graf;
+}
 
-    els.graf.data.labels = s.time;
-    els.graf.data.datasets[0].data = s.temperatura;
-    els.graf.data.datasets[1].data = s.umidade;
-    els.graf.update();
+function initializeLiquidBackground() {
+  const canvas = document.getElementById('liquidCanvas');
+  const ctx = canvas.getContext('2d');
+  
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  
+  const particles = [];
+  const particleCount = 50;
+  
+  for (let i = 0; i < particleCount; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      size: Math.random() * 3 + 1,
+      speedX: (Math.random() - 0.5) * 0.5,
+      speedY: (Math.random() - 0.5) * 0.5,
+      color: `rgba(0, 255, 136, ${Math.random() * 0.1 + 0.05})`
+    });
+  }
+  
+  function animate() {
+    ctx.fillStyle = 'rgba(10, 10, 10, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    particles.forEach(particle => {
+      particle.x += particle.speedX;
+      particle.y += particle.speedY;
+      
+      if (particle.x < 0 || particle.x > canvas.width) particle.speedX *= -1;
+      if (particle.y < 0 || particle.y > canvas.height) particle.speedY *= -1;
+      
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+      ctx.fillStyle = particle.color;
+      ctx.fill();
+    });
+    
+    requestAnimationFrame(animate);
+  }
+  
+  animate();
+}
 
-    const dados = (await fetch(`${API}/dados?limit=30`).then(r=>r.json())).reverse();
-    els.tbody.innerHTML = dados.map(p => `
-      <tr>
-        <td>${p.time}</td>
-        <td>${p.temperatura.toFixed(2)}</td>
-        <td>${p.umidade.toFixed(2)}</td>
-      </tr>
-    `).join("");
-
-    els.mediaT.textContent = a.temperatura?.media ? a.temperatura.media.toFixed(2) : "—";
-    els.mediaU.textContent = a.umidade?.media ? a.umidade.media.toFixed(2) : "—";
-
-  } catch (e) {
-    // ignora erros para demo
+function checkAuthentication() {
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  if (isAuthenticated) {
+    showMainContent();
+  } else {
+    showLoginModal();
   }
 }
 
-// =========================
-// 🔥 Chat IA Local (Ollama) + CSV Inteligente
-// =========================
-// Atualize a função enviarChat() para usar as novas classes:
+async function handleLogin(e) {
+  e.preventDefault();
+  
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const loginBtn = e.target.querySelector('.login-btn');
+  
+  loginBtn.classList.add('loading');
+  els.loginError.textContent = '';
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (username === 'admin' && password === '12345') {
+      localStorage.setItem('isAuthenticated', 'true');
+      showMainContent();
+    } else {
+      throw new Error('Credenciais inválidas. Use admin/12345');
+    }
+  } catch (error) {
+    els.loginError.textContent = error.message;
+  } finally {
+    loginBtn.classList.remove('loading');
+  }
+}
+
+function handleLogout() {
+  localStorage.removeItem('isAuthenticated');
+  showLoginModal();
+  state.currentSessionId = null;
+  // Limpar mensagens do chat mas manter a mensagem de boas-vindas
+  const welcomeMessage = els.chatBox.querySelector('.welcome-message');
+  els.chatBox.innerHTML = '';
+  if (welcomeMessage) {
+    els.chatBox.appendChild(welcomeMessage);
+  }
+}
+
+function showLoginModal() {
+  els.loginModal.classList.add('active');
+  els.mainContent.classList.add('hidden');
+  els.loginForm.reset();
+  els.loginError.textContent = '';
+}
+
+function showMainContent() {
+  els.loginModal.classList.remove('active');
+  els.mainContent.classList.remove('hidden');
+  checkSystemReady();
+}
+
+function updateConnectionStatus() {
+  if (!els.connectionStatus) return;
+
+  switch(state.connectionStatus) {
+    case 'checking':
+      els.connectionStatus.innerHTML = 'Conectando ao servidor e coletando dados...';
+      els.connectionStatus.className = 'connection-status status-checking';
+      break;
+    case 'connected':
+      els.connectionStatus.innerHTML = 'Conectado ao servidor - Dados em tempo real';
+      els.connectionStatus.className = 'connection-status status-connected';
+      break;
+    case 'error':
+      els.connectionStatus.innerHTML = 'Erro de conexão com o servidor';
+      els.connectionStatus.className = 'connection-status status-error';
+      break;
+  }
+}
+
+async function checkSystemReady() {
+  try {
+    // Tentar buscar dados diretamente para verificar se o servidor está respondendo
+    const response = await fetch(`${API}/dados?limit=1`);
+    if (response.ok) {
+      state.systemReady = true;
+      state.connectionStatus = 'connected';
+      updateConnectionStatus();
+      
+      console.log("✅ Sistema pronto com dados reais");
+      tick(); // Primeira execução imediata
+      setInterval(tick, 5000); // Executar a cada 5 segundos
+    } else {
+      throw new Error('Servidor não respondeu corretamente');
+    }
+  } catch (e) {
+    console.log("Erro ao verificar sistema:", e);
+    state.connectionStatus = 'error';
+    updateConnectionStatus();
+    setTimeout(checkSystemReady, 5000);
+  }
+}
+
+// Função para processar dados do servidor e atualizar o gráfico
+function processDataForChart(dados) {
+  if (!dados || !Array.isArray(dados) || dados.length === 0) {
+    console.warn('Dados inválidos ou vazios:', dados);
+    return;
+  }
+
+  try {
+    // Ordenar dados por timestamp (mais recentes primeiro)
+    const dadosOrdenados = [...dados].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    // Limitar a 20 pontos para performance
+    const dadosLimitados = dadosOrdenados.slice(-20);
+    
+    // Extrair dados para o gráfico
+    const labels = dadosLimitados.map(item => {
+      const date = new Date(item.timestamp);
+      return date.toLocaleTimeString('pt-BR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    });
+    
+    const temperaturas = dadosLimitados.map(item => parseFloat(item.temperatura));
+    const umidades = dadosLimitados.map(item => parseFloat(item.umidade));
+    const luminosidades = dadosLimitados.map(item => parseFloat(item.luminosidade));
+    const niveisAgua = dadosLimitados.map(item => parseFloat(item.nivel_reservatorio));
+
+    // Atualizar o gráfico
+    els.graf.data.labels = labels;
+    els.graf.data.datasets[0].data = temperaturas;
+    els.graf.data.datasets[1].data = umidades;
+    els.graf.data.datasets[2].data = luminosidades;
+    
+    els.graf.update('none');
+    
+    // Atualizar estado com os dados processados
+    state.chartData = {
+      labels,
+      temperatura: temperaturas,
+      umidade: umidades,
+      luminosidade: luminosidades,
+      nivel_agua: niveisAgua
+    };
+
+    // Remover estado de erro se existir
+    document.querySelector('.chart-container').classList.remove('chart-error', 'chart-loading');
+    
+    console.log('📊 Gráfico atualizado com', dadosLimitados.length, 'pontos de dados');
+    
+  } catch (error) {
+    console.error('Erro ao processar dados para gráfico:', error);
+    document.querySelector('.chart-container').classList.add('chart-error');
+  }
+}
+
+// Função para atualizar dados globais e calcular médias
+function updateGlobalData(dados) {
+  if (!dados || !Array.isArray(dados) || dados.length === 0) return;
+
+  try {
+    const temps = dados.map(item => parseFloat(item.temperatura)).filter(val => !isNaN(val));
+    const umids = dados.map(item => parseFloat(item.umidade)).filter(val => !isNaN(val));
+    const lights = dados.map(item => parseFloat(item.luminosidade)).filter(val => !isNaN(val));
+    const waters = dados.map(item => parseFloat(item.nivel_reservatorio)).filter(val => !isNaN(val));
+
+    if (temps.length > 0 && umids.length > 0) {
+      state.estufaData = {
+        mediaTemperatura: temps.reduce((a, b) => a + b, 0) / temps.length,
+        mediaUmidade: umids.reduce((a, b) => a + b, 0) / umids.length,
+        mediaLuminosidade: lights.reduce((a, b) => a + b, 0) / lights.length,
+        mediaNivelAgua: waters.reduce((a, b) => a + b, 0) / waters.length,
+        lastUpdate: new Date().toISOString(),
+        totalRegistros: dados.length
+      };
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar dados globais:', error);
+  }
+}
+
+// Função para atualizar a tabela
+function updateTable(dados) {
+  if (!dados || !Array.isArray(dados)) return;
+
+  try {
+    // Ordenar por timestamp (mais recentes primeiro)
+    const dadosOrdenados = [...dados].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    els.tbody.innerHTML = dadosOrdenados.map(item => `
+      <tr>
+        <td>${new Date(item.timestamp).toLocaleTimeString('pt-BR', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          second: '2-digit'
+        })}</td>
+        <td>sim_01</td>
+        <td>${parseFloat(item.temperatura).toFixed(1)}</td>
+        <td>${parseFloat(item.umidade).toFixed(1)}</td>
+        <td>${Math.round(parseFloat(item.luminosidade))}</td>
+        <td>${parseFloat(item.nivel_reservatorio).toFixed(2)}</td>
+      </tr>
+    `).join("");
+    
+    els.dataCount.textContent = `${dados.length} registros`;
+    
+  } catch (error) {
+    console.error('Erro ao atualizar tabela:', error);
+  }
+}
+
+function updateTrendIndicators(currentData, previousData) {
+  if (!previousData) return;
+
+  const tempChange = currentData.mediaTemperatura - previousData.mediaTemperatura;
+  updateTrendElement(els.tempTrend, tempChange);
+  
+  const humidityChange = currentData.mediaUmidade - previousData.mediaUmidade;
+  updateTrendElement(els.humidityTrend, humidityChange);
+  
+  const lightChange = currentData.mediaLuminosidade - previousData.mediaLuminosidade;
+  updateTrendElement(els.lightTrend, lightChange);
+  
+  const waterChange = currentData.mediaNivelAgua - previousData.mediaNivelAgua;
+  updateTrendElement(els.waterTrend, waterChange);
+}
+
+function updateTrendElement(element, change) {
+  const absChange = Math.abs(change);
+  if (absChange < 0.1) {
+    element.textContent = 'Estável';
+  } else if (change > 0) {
+    element.textContent = `Subindo`;
+  } else {
+    element.textContent = `Descendo`;
+  }
+}
+
+function updateCurrentValues() {
+  const data = state.estufaData;
+  
+  els.currentTemp.textContent = data.mediaTemperatura ? data.mediaTemperatura.toFixed(1) : '--';
+  els.currentHumidity.textContent = data.mediaUmidade ? data.mediaUmidade.toFixed(1) : '--';
+  els.currentLight.textContent = data.mediaLuminosidade ? Math.round(data.mediaLuminosidade) : '--';
+  els.currentWaterLevel.textContent = data.mediaNivelAgua ? data.mediaNivelAgua.toFixed(2) : '--';
+  
+  els.mediaT.textContent = data.mediaTemperatura ? data.mediaTemperatura.toFixed(1) : '—';
+  els.mediaU.textContent = data.mediaUmidade ? data.mediaUmidade.toFixed(1) : '—';
+  els.mediaLight.textContent = data.mediaLuminosidade ? Math.round(data.mediaLuminosidade) : '—';
+  els.mediaWater.textContent = data.mediaNivelAgua ? data.mediaNivelAgua.toFixed(2) : '—';
+  
+  // Atualizar tendências das médias
+  els.tempMediaTrend.textContent = 'Estável';
+  els.humidityMediaTrend.textContent = 'Estável';
+  els.lightMediaTrend.textContent = 'Estável';
+  els.waterMediaTrend.textContent = 'Estável';
+}
+
+async function tick() {
+  if (!state.systemReady) return;
+
+  try {
+    console.log('🔄 Buscando dados do servidor...');
+    
+    // Buscar dados do endpoint /dados
+    const response = await fetch(`${API}/dados?limit=20`);
+    
+    if (!response.ok) {
+      throw new Error(`Erro HTTP: ${response.status}`);
+    }
+    
+    const dados = await response.json();
+    
+    if (!Array.isArray(dados) || dados.length === 0) {
+      throw new Error('Dados recebidos não são um array válido');
+    }
+
+    console.log('✅ Dados recebidos:', dados.length, 'registros');
+    
+    const previousData = state.previousData;
+    state.previousData = { ...state.estufaData };
+
+    // Processar dados para gráfico
+    processDataForChart(dados);
+    
+    // Atualizar tabela
+    updateTable(dados);
+    
+    // Atualizar dados globais e médias
+    updateGlobalData(dados);
+    
+    // Atualizar valores atuais
+    updateCurrentValues();
+    
+    // Atualizar tendências
+    if (previousData) {
+      updateTrendIndicators(state.estufaData, previousData);
+    }
+
+    state.connectionStatus = 'connected';
+    updateConnectionStatus();
+
+  } catch (error) {
+    console.error("❌ Erro ao atualizar dados:", error);
+    state.connectionStatus = 'error';
+    updateConnectionStatus();
+    document.querySelector('.chart-container').classList.add('chart-error');
+  }
+}
 
 async function enviarChat() {
-  const m = els.chatInput.value.trim();
-  if (!m) return;
+  const mensagem = els.chatInput.value.trim();
+  if (!mensagem) return;
 
-  // Exibe mensagem do usuário (direita)
-  const userMessage = document.createElement('div');
-  userMessage.className = 'message user-message';
-  userMessage.textContent = m;
-  els.chatBox.appendChild(userMessage);
-  
+  addMessageToChat(mensagem, 'user');
   els.chatInput.value = "";
-  els.chatBox.scrollTop = els.chatBox.scrollHeight;
-
-  // Indicador "digitando..." (esquerda)
-  const thinking = document.createElement('div');
-  thinking.className = 'typing-indicator';
-  thinking.innerHTML = `
-    <div class="typing-text">Digitando</div>
-    <div class="typing-dots">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
-  `;
-  els.chatBox.appendChild(thinking);
-  els.chatBox.scrollTop = els.chatBox.scrollHeight;
-
+  
+  const thinking = showTypingIndicator();
+  
   els.chatInput.disabled = true;
   els.btnChat.disabled = true;
 
   try {
-    // 🧠 Intercepta mensagens que pedem dados ou exportação
-    if (/\b(csv|exportar|baixar|dados|arquivo|relatório)\b/i.test(m)) {
-      thinking.remove();
-      const botMessage = document.createElement('div');
-      botMessage.className = 'message bot-message';
-      botMessage.innerHTML = `
-        📊 Tudo pronto! Você pode baixar os dados da estufa clicando no botão abaixo:<br><br>
-        <a href="${API}/export.csv" class="btn-download" target="_blank" rel="noopener">⬇️ Baixar CSV</a>
-      `;
-      els.chatBox.appendChild(botMessage);
-      els.chatBox.scrollTop = els.chatBox.scrollHeight;
-      return;
-    }
-
-    // 🤖 Chamada para a IA local
-    const res = await fetch("http://localhost:11434/api/chat", {
+    const resposta = await fetch(`${API}/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "qwen2:1.5b",
-        stream: false,
-        messages: [
-          { 
-            role: "system", 
-            content: "Você é um assistente técnico da Estufa IoT. Responda de forma clara, concisa e sempre em português do Brasil." 
-          },
-          { role: "user", content: m }
-        ]
+      headers: { 
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ 
+        mensagem: mensagem,
+        session_id: state.currentSessionId 
       })
     });
 
-    if (!res.ok) throw new Error("Erro na requisição");
-    const data = await res.json();
+    if (!resposta.ok) {
+      throw new Error(`Erro HTTP: ${resposta.status}`);
+    }
 
-    const resposta = (data.message?.content || data.response || "Sem resposta.")
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}]/gu, '')
-      .trim();
-
-    thinking.remove();
-    const botMessage = document.createElement('div');
-    botMessage.className = 'message bot-message';
-    botMessage.textContent = resposta;
-    els.chatBox.appendChild(botMessage);
+    const data = await resposta.json();
     
-  } catch (err) {
-    console.error(err);
+    if (data.session_id) {
+      state.currentSessionId = data.session_id;
+    }
+    
     thinking.remove();
-    const errorMessage = document.createElement('div');
-    errorMessage.className = 'message bot-message';
-    errorMessage.textContent = '❌ Erro ao conectar com a IA local.';
-    els.chatBox.appendChild(errorMessage);
+    addMessageToChat(data.resposta || 'Resposta recebida sem conteúdo', 'bot');
+
+  } catch (err) {
+    console.error('Erro no chat:', err);
+    thinking.remove();
+    addMessageToChat('Erro ao processar sua mensagem. Tente novamente.', 'bot');
   } finally {
     els.chatInput.disabled = false;
     els.btnChat.disabled = false;
-    els.chatBox.scrollTop = els.chatBox.scrollHeight;
     els.chatInput.focus();
   }
 }
+
+function addMessageToChat(texto, tipo) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message ${tipo}-message`;
+  
+  const timestamp = new Date().toLocaleTimeString('pt-BR', { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+  
+  if (tipo === 'user') {
+    messageDiv.innerHTML = `
+      <div class="message-content">
+        <div class="message-text">${texto}</div>
+        <div class="message-time">${timestamp}</div>
+      </div>
+    `;
+  } else {
+    messageDiv.innerHTML = `
+      <div class="bot-avatar">🌱</div>
+      <div class="message-content">
+        <div class="message-text">${texto}</div>
+        <div class="message-time">${timestamp}</div>
+      </div>
+    `;
+  }
+  
+  els.chatBox.appendChild(messageDiv);
+  els.chatBox.scrollTop = els.chatBox.scrollHeight;
+}
+
+function showTypingIndicator() {
+  const thinking = document.createElement('div');
+  thinking.className = 'message bot-message';
+  thinking.innerHTML = `
+    <div class="bot-avatar">🌱</div>
+    <div class="message-content">
+      <div class="typing-indicator">
+        <div class="typing-text">Digitando</div>
+        <div class="typing-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  els.chatBox.appendChild(thinking);
+  els.chatBox.scrollTop = els.chatBox.scrollHeight;
+  return thinking;
+}
+
+// Expor estado global para debug
+window.estufaData = state.estufaData;
+window.state = state;
