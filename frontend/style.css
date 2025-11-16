@@ -520,7 +520,7 @@ body {
 
 .chart-container {
   padding: 20px;
-  height: 340px;
+  height: 500px;
   position: relative;
 }
 
@@ -909,6 +909,59 @@ tr:last-child td {
   transform: translate(-50%, -50%);
   color: var(--error);
   font-size: 14px;
+}
+
+/* Adicione ao seu CSS existente */
+.download-section {
+  margin: 15px 0;
+  padding: 0 10px;
+}
+
+.download-card {
+  background: linear-gradient(135deg, #00ff88 0%, #00d4ff 100%);
+  border-radius: 12px;
+  padding: 20px;
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+}
+
+.download-icon {
+  font-size: 2em;
+  flex-shrink: 0;
+}
+
+.download-info h4 {
+  margin: 0 0 5px 0;
+  font-weight: 600;
+}
+
+.download-info p {
+  margin: 0 0 10px 0;
+  opacity: 0.8;
+  font-size: 0.9em;
+}
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9em;
+  transition: all 0.3s ease;
+}
+
+.download-btn:hover {
+  background: rgba(0, 0, 0, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Responsividade */

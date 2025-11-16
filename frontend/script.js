@@ -85,7 +85,6 @@ function setupEventListeners() {
 function setupChart() {
   const ctx = document.getElementById("grafico").getContext("2d");
   
-  // Destruir gráfico existente se houver
   if (window.existingChart) {
     window.existingChart.destroy();
   }
@@ -169,9 +168,7 @@ function setupChart() {
           callbacks: {
             label: function(context) {
               let label = context.dataset.label || '';
-              if (label) {
-                label += ': ';
-              }
+              if (label) label += ': ';
               if (context.parsed.y !== null) {
                 if (label.includes('Temperatura') || label.includes('Umidade')) {
                   label += context.parsed.y.toFixed(1);
@@ -339,7 +336,6 @@ function handleLogout() {
   localStorage.removeItem('isAuthenticated');
   showLoginModal();
   state.currentSessionId = null;
-  // Limpar mensagens do chat mas manter a mensagem de boas-vindas
   const welcomeMessage = els.chatBox.querySelector('.welcome-message');
   els.chatBox.innerHTML = '';
   if (welcomeMessage) {
@@ -381,7 +377,6 @@ function updateConnectionStatus() {
 
 async function checkSystemReady() {
   try {
-    // Tentar buscar dados diretamente para verificar se o servidor está respondendo
     const response = await fetch(`${API}/dados?limit=1`);
     if (response.ok) {
       state.systemReady = true;
@@ -389,8 +384,8 @@ async function checkSystemReady() {
       updateConnectionStatus();
       
       console.log("✅ Sistema pronto com dados reais");
-      tick(); // Primeira execução imediata
-      setInterval(tick, 5000); // Executar a cada 5 segundos
+      tick();
+      setInterval(tick, 5000);
     } else {
       throw new Error('Servidor não respondeu corretamente');
     }
@@ -402,7 +397,6 @@ async function checkSystemReady() {
   }
 }
 
-// Função para processar dados do servidor e atualizar o gráfico
 function processDataForChart(dados) {
   if (!dados || !Array.isArray(dados) || dados.length === 0) {
     console.warn('Dados inválidos ou vazios:', dados);
@@ -410,15 +404,11 @@ function processDataForChart(dados) {
   }
 
   try {
-    // Ordenar dados por timestamp (mais recentes primeiro)
-    const dadosOrdenados = [...dados].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    
-    // Limitar a 20 pontos para performance
+    const dadosOrdenados = [...dados].sort((a, b) => new Date(a.time || a.timestamp) - new Date(b.time || b.timestamp));
     const dadosLimitados = dadosOrdenados.slice(-20);
     
-    // Extrair dados para o gráfico
     const labels = dadosLimitados.map(item => {
-      const date = new Date(item.timestamp);
+      const date = new Date(item.time || item.timestamp);
       return date.toLocaleTimeString('pt-BR', { 
         hour: '2-digit', 
         minute: '2-digit',
@@ -428,10 +418,9 @@ function processDataForChart(dados) {
     
     const temperaturas = dadosLimitados.map(item => parseFloat(item.temperatura));
     const umidades = dadosLimitados.map(item => parseFloat(item.umidade));
-    const luminosidades = dadosLimitados.map(item => parseFloat(item.luminosidade));
-    const niveisAgua = dadosLimitados.map(item => parseFloat(item.nivel_reservatorio));
+    const luminosidades = dadosLimitados.map(item => parseFloat(item.luminosidade || 0));
+    const niveisAgua = dadosLimitados.map(item => parseFloat(item.nivel_reservatorio || 0));
 
-    // Atualizar o gráfico
     els.graf.data.labels = labels;
     els.graf.data.datasets[0].data = temperaturas;
     els.graf.data.datasets[1].data = umidades;
@@ -439,7 +428,6 @@ function processDataForChart(dados) {
     
     els.graf.update('none');
     
-    // Atualizar estado com os dados processados
     state.chartData = {
       labels,
       temperatura: temperaturas,
@@ -448,7 +436,6 @@ function processDataForChart(dados) {
       nivel_agua: niveisAgua
     };
 
-    // Remover estado de erro se existir
     document.querySelector('.chart-container').classList.remove('chart-error', 'chart-loading');
     
     console.log('📊 Gráfico atualizado com', dadosLimitados.length, 'pontos de dados');
@@ -459,22 +446,21 @@ function processDataForChart(dados) {
   }
 }
 
-// Função para atualizar dados globais e calcular médias
 function updateGlobalData(dados) {
   if (!dados || !Array.isArray(dados) || dados.length === 0) return;
 
   try {
     const temps = dados.map(item => parseFloat(item.temperatura)).filter(val => !isNaN(val));
     const umids = dados.map(item => parseFloat(item.umidade)).filter(val => !isNaN(val));
-    const lights = dados.map(item => parseFloat(item.luminosidade)).filter(val => !isNaN(val));
-    const waters = dados.map(item => parseFloat(item.nivel_reservatorio)).filter(val => !isNaN(val));
+    const lights = dados.map(item => parseFloat(item.luminosidade || 0)).filter(val => !isNaN(val));
+    const waters = dados.map(item => parseFloat(item.nivel_reservatorio || 0)).filter(val => !isNaN(val));
 
     if (temps.length > 0 && umids.length > 0) {
       state.estufaData = {
         mediaTemperatura: temps.reduce((a, b) => a + b, 0) / temps.length,
         mediaUmidade: umids.reduce((a, b) => a + b, 0) / umids.length,
-        mediaLuminosidade: lights.reduce((a, b) => a + b, 0) / lights.length,
-        mediaNivelAgua: waters.reduce((a, b) => a + b, 0) / waters.length,
+        mediaLuminosidade: lights.length ? lights.reduce((a, b) => a + b, 0) / lights.length : 0,
+        mediaNivelAgua: waters.length ? waters.reduce((a, b) => a + b, 0) / waters.length : 0,
         lastUpdate: new Date().toISOString(),
         totalRegistros: dados.length
       };
@@ -484,17 +470,15 @@ function updateGlobalData(dados) {
   }
 }
 
-// Função para atualizar a tabela
 function updateTable(dados) {
   if (!dados || !Array.isArray(dados)) return;
 
   try {
-    // Ordenar por timestamp (mais recentes primeiro)
-    const dadosOrdenados = [...dados].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const dadosOrdenados = [...dados].sort((a, b) => new Date(b.time || b.timestamp) - new Date(a.time || a.timestamp));
     
     els.tbody.innerHTML = dadosOrdenados.map(item => `
       <tr>
-        <td>${new Date(item.timestamp).toLocaleTimeString('pt-BR', { 
+        <td>${new Date(item.time || item.timestamp).toLocaleTimeString('pt-BR', { 
           hour: '2-digit', 
           minute: '2-digit',
           second: '2-digit'
@@ -502,8 +486,8 @@ function updateTable(dados) {
         <td>sim_01</td>
         <td>${parseFloat(item.temperatura).toFixed(1)}</td>
         <td>${parseFloat(item.umidade).toFixed(1)}</td>
-        <td>${Math.round(parseFloat(item.luminosidade))}</td>
-        <td>${parseFloat(item.nivel_reservatorio).toFixed(2)}</td>
+        <td>${Math.round(parseFloat(item.luminosidade || 0))}</td>
+        <td>${parseFloat(item.nivel_reservatorio || 0).toFixed(2)}</td>
       </tr>
     `).join("");
     
@@ -554,7 +538,6 @@ function updateCurrentValues() {
   els.mediaLight.textContent = data.mediaLuminosidade ? Math.round(data.mediaLuminosidade) : '—';
   els.mediaWater.textContent = data.mediaNivelAgua ? data.mediaNivelAgua.toFixed(2) : '—';
   
-  // Atualizar tendências das médias
   els.tempMediaTrend.textContent = 'Estável';
   els.humidityMediaTrend.textContent = 'Estável';
   els.lightMediaTrend.textContent = 'Estável';
@@ -567,7 +550,6 @@ async function tick() {
   try {
     console.log('🔄 Buscando dados do servidor...');
     
-    // Buscar dados do endpoint /dados
     const response = await fetch(`${API}/dados?limit=20`);
     
     if (!response.ok) {
@@ -585,19 +567,11 @@ async function tick() {
     const previousData = state.previousData;
     state.previousData = { ...state.estufaData };
 
-    // Processar dados para gráfico
     processDataForChart(dados);
-    
-    // Atualizar tabela
     updateTable(dados);
-    
-    // Atualizar dados globais e médias
     updateGlobalData(dados);
-    
-    // Atualizar valores atuais
     updateCurrentValues();
     
-    // Atualizar tendências
     if (previousData) {
       updateTrendIndicators(state.estufaData, previousData);
     }
@@ -648,7 +622,35 @@ async function enviarChat() {
     }
     
     thinking.remove();
-    addMessageToChat(data.resposta || 'Resposta recebida sem conteúdo', 'bot');
+    
+    // Verificar se tem relatório para download
+    if (data.tem_relatorio && data.url_download) {
+      addMessageToChat(data.resposta, 'bot');
+      
+      // Adicionar botão de download
+      const downloadDiv = document.createElement('div');
+      downloadDiv.className = 'download-section';
+      downloadDiv.innerHTML = `
+        <div class="download-card">
+          <div class="download-info">
+            <h4>Relatório Gerado</h4>
+            <p>Dados completos da estufa + análise inteligente</p>
+            <a href="${API}${data.url_download}" class="download-btn" download>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="2"/>
+                <polyline points="7,10 12,15 17,10" stroke="currentColor" stroke-width="2" fill="none"/>
+                <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              Baixar CSV
+            </a>
+          </div>
+        </div>
+      `;
+      
+      els.chatBox.appendChild(downloadDiv);
+    } else {
+      addMessageToChat(data.resposta, 'bot');
+    }
 
   } catch (err) {
     console.error('Erro no chat:', err);
@@ -669,23 +671,29 @@ function addMessageToChat(texto, tipo) {
     hour: '2-digit', 
     minute: '2-digit' 
   });
-  
-  if (tipo === 'user') {
-    messageDiv.innerHTML = `
+
+  let conteudoHtml;
+
+  if (tipo === 'bot') {
+    // troca quebras de linha por <br> pra deixar o analítico bonitão
+    const safeText = texto.replace(/\n/g, '<br>');
+    conteudoHtml = `
+      <div class="bot-avatar">🌱</div>
       <div class="message-content">
-        <div class="message-text">${texto}</div>
+        <div class="message-text">${safeText}</div>
         <div class="message-time">${timestamp}</div>
       </div>
     `;
   } else {
-    messageDiv.innerHTML = `
-      <div class="bot-avatar">🌱</div>
+    conteudoHtml = `
       <div class="message-content">
         <div class="message-text">${texto}</div>
         <div class="message-time">${timestamp}</div>
       </div>
     `;
   }
+  
+  messageDiv.innerHTML = conteudoHtml;
   
   els.chatBox.appendChild(messageDiv);
   els.chatBox.scrollTop = els.chatBox.scrollHeight;
@@ -698,7 +706,7 @@ function showTypingIndicator() {
     <div class="bot-avatar">🌱</div>
     <div class="message-content">
       <div class="typing-indicator">
-        <div class="typing-text">Digitando</div>
+        <div class="typing-text">Pensando</div>
         <div class="typing-dots">
           <span></span>
           <span></span>
@@ -713,6 +721,6 @@ function showTypingIndicator() {
   return thinking;
 }
 
-// Expor estado global para debug
+// Debug global
 window.estufaData = state.estufaData;
 window.state = state;
