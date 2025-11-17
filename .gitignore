@@ -34,3 +34,5 @@ data/exports/*.csv
 .DS_Store
 Thumbs.db
 
+node_modules
+package-lock.json
