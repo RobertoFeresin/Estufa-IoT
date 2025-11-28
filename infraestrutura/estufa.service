@@ -1,0 +1,18 @@
+[Unit]
+Description=Estufa Inteligente - MQTT/OPC UA bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi4b
+Group=pi4b
+WorkingDirectory=/home/pi4b/Desktop/estufa
+ExecStart=/home/pi4b/Desktop/estufa/venv/bin/python3 /home/pi4b/Desktop/estufa/estufa_opcua.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/pi4b/Desktop/estufa/logs/estufa_stdout.log
+StandardError=append:/home/pi4b/Desktop/estufa/logs/estufa_stderr.log
+
+[Install]
+WantedBy=multi-user.target

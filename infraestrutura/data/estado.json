@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-11-17T22:04:05.319268",
+  "temperatura": 26.74,
+  "umidade": 75.04,
+  "luminosidade": 777.63,
+  "nivel_reservatorio": 15.68,
+  "atuadores": {
+    "bomba_agua": false,
+    "luminaria": false,
+    "ventilador": false,
+    "exaustor": false,
+    "emergencia": false
+  }
+}
