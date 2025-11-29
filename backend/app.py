@@ -27,9 +27,6 @@ AUTH_HEADER = {"Authorization": f"Basic {credentials}"}
 # URL do Ollama
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434/api/chat")
 
-app = Flask(__name__)
-CORS(app, origins=["*"], methods=["GET", "POST"], allow_headers=["Content-Type"])
-
 # =========================
 # ESTADO EM MEMÓRIA
 # =========================
