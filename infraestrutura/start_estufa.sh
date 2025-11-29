@@ -118,10 +118,11 @@ elif [ "$modo" == "2" ]; then
   echo "==============================================="
   echo "📊 Gerando dados simulados via MQTT e salvando em ./data/"
   echo ""
-  python3 estufa_opcua_simulate.py &
+
+  python3 estufa_opcua.py &
   SIM_PID=$!
   sleep 3
-  python3 estufa_opcua.py
+  python3 estufa_opcua_simulate.py
   kill $SIM_PID >/dev/null 2>&1
 
 else

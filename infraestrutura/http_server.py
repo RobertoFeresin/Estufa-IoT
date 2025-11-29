@@ -10,8 +10,8 @@ PASSWORD = "12345"
 # --- Caminhos de dados ---
 BASE = Path(__file__).resolve().parent
 DATA_DIR = BASE / "data"
-CSV_PATH = DATA_DIR / "registros.csv"
-JSON_PATH = DATA_DIR / "estado.json"
+JSON_REGISTROS = DATA_DIR / "registros.json"
+JSON_ESTADO = DATA_DIR / "estado.json"
 
 app = Flask(__name__)
 
@@ -46,22 +46,25 @@ def home():
 @app.route("/estado")
 @requires_auth
 def estado():
-    if not JSON_PATH.exists():
+    if not JSON_ESTADO.exists():
         return jsonify({"erro": "Arquivo estado.json não encontrado"}), 404
-    with open(JSON_PATH, "r") as f:
+    with open(JSON_ESTADO, "r") as f:
         return jsonify(json.load(f))
 
 @app.route("/registros")
 @requires_auth
 def registros():
-    if not CSV_PATH.exists():
+    if not JSON_REGISTROS.exists():
         return jsonify({"erro": "Arquivo registros.csv não encontrado"}), 404
-    limit = int(request.args.get("limit", 10))
+    limit = int(request.args.get("limit", 20))
     rows = []
-    with open(CSV_PATH, "r") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)[-limit:]
-    return jsonify(rows)
+    with open(JSON_REGISTROS, "r") as f:
+        historico = json.load(f)
+
+    # Caso o arquivo esteja vazio ou corrompido
+    if not isinstance(historico,list):
+        return jsonify([])
+    return jsonify(historico[-limit:])
 
 if __name__ == "__main__":
     print(f"Servidor HTTP rodando em todas as interfaces (porta 5000)")

@@ -1,4 +1,4 @@
-#!/home/pi4b/Desktop/teste-comunicacao/venv/bin/python3
+#!/home/pi4b/Desktop/Estufa-Iot/infraestrutura/venv/bin/python3
 # -*- coding: utf-8 -*-
 """
 Estufa Inteligente - Bridge MQTT -> OPC UA + Controle GPIO + CSV
@@ -17,8 +17,8 @@ import asyncio
 import threading
 from datetime import datetime
 
-# Recomenda executar com python do venv: /home/pi4b/Desktop/teste-comunicacao/venv/bin/python3
-EXPECTED_PYTHON = "/home/pi4b/Desktop/teste-comunicacao/venv/bin/python3"
+
+EXPECTED_PYTHON = "/home/pi4b/Desktop/Estufa-Iot/infraestrutura/venv/bin/python3"
 if sys.executable != EXPECTED_PYTHON:
     print(f"[AVISO] Recomenda-se executar com: {EXPECTED_PYTHON} (python atual: {sys.executable})")
 
@@ -54,13 +54,15 @@ except Exception:
 # -------------------------
 # Paths / logging / csv
 # -------------------------
-BASE_DIR = "/home/pi4b/Desktop/teste-comunicacao"
+BASE_DIR = "/home/pi4b/Desktop/Estufa-Iot/infraestrutura"
+DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(BASE_DIR, exist_ok=True)
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 LOG_FILE = os.path.join(LOG_DIR, "estufa_opcua.log")
-CSV_FILE = os.path.join(BASE_DIR, "dados_estufa.csv")
+JSON_ESTADO = os.path.join(DATA_DIR, "estado.json")
+JSON_REGISTRO = os.path.join(DATA_DIR,"registros.json")
 
 logger = logging.getLogger("estufa")
 logger.setLevel(logging.INFO)
@@ -143,42 +145,72 @@ data_lock = threading.Lock()
 # -------------------------
 # funções utilitárias
 # -------------------------
-def registrar_csv_once_header():
-    if not os.path.isfile(CSV_FILE):
-        header = [
-            "timestamp",
-            "temperatura", "umidade", "luminosidade", "umidade_solo",
-            "nivel_baixo", "nivel_alto"
-        ]
-        header += list(PINS.keys())
-        for n in PINS.keys():
-            header += [f"{n}_fb_ativado", f"{n}_fb_desativado"]
-        header += list(alarmes.keys())
-        with open(CSV_FILE, "w", newline="") as f:
-            w = csv.writer(f)
-            w.writerow(header)
+def registrar_json_row():
+    entry = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "temperatura":dados.get("temperatura"),
+        "umidade": dados.get("umidade"),
+        "luminosidade": dados.get("luminosidade"),
+        "umidade_solo":dados.get("umidade_solo"),
+        "nivel_baixo":bool(dados.get("nivel_baixo")),
+        "nivel_alto": bool(dados.get("nivel_alto")),
+        #Estado do relés
+        "bomba": int(bool(estado_reles["bomba"])),
+        "valvula": int(bool(estado_reles["valvula"])),
+        "luminaria": int(bool(estado_reles["luminaria"])),
+        "ventilador": int(bool(estado_reles["ventilador"])),
+        "exaustor": int(bool(estado_reles["exaustor"])),
+        "emergencia": int(bool(estado_reles["emergencia"])),
+        # Feedbacka
+        "bomba_fb_ativado": int(bool(feedbacks["bomba_fb_ativado"])),       
+        "bomba_fb_desativado": int(bool(feedbacks["bomba_fb_desativado"])),
+        "valvula_fb_ativado": int(bool(feedbacks["valvula_fb_ativado"])),
+        "valvula_fb_desativado": int(bool(feedbacks["valvula_fb_desativado"])),
+        "luminaria_fb_ativado": int(bool(feedbacks["luminaria_fb_ativado"])),
+        "luminaria_fb_desativado": int(bool(feedbacks["luminaria_fb_desativado"])),
+        "ventilador_fb_ativado": int(bool(feedbacks["ventilador_fb_ativado"])),
+        "ventilador_fb_desativado": int(bool(feedbacks["ventilador_fb_desativado"])),
+        "exaustor_fb_ativado": int(bool(feedbacks["exaustor_fb_ativado"])),
+        "exaustor_fb_desativado": int(bool(feedbacks["exaustor_fb_desativado"])),
+        "emergencia_fb_ativado": int(bool(feedbacks["emergencia_fb_ativado"])),
+        "emergencia_fb_desativado": int(bool(feedbacks["emergencia_fb_desativado"])),
+        #Alarmes
+        "alarme_temperatura_baixo": int(bool(alarmes["alarme_temperatura_baixo"])),
+        "alarme_temperatura_alto": int(bool(alarmes["alarme_temperatura_alto"])),
+        "alarme_umidade_baixo": int(bool(alarmes["alarme_umidade_baixo"])),
+        "alarme_umidade_alto": int(bool(alarmes["alarme_umidade_alto"])),
+        "alarme_luminosidade_baixo": int(bool(alarmes["alarme_luminosidade_baixo"])),
+        "alarme_luminosidade_alto": int(bool(alarmes["alarme_luminosidade_alto"])),
+        "alarme_umidade_solo_baixo": int(bool(alarmes["alarme_umidade_solo_baixo"])),
+        "alarme_umidade_solo_alto": int(bool(alarmes["alarme_umidade_solo_alto"])),
+    }
 
-def registrar_csv_row():
-    with data_lock:
-        row = [
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            dados.get("temperatura"),
-            dados.get("umidade"),
-            dados.get("luminosidade"),
-            dados.get("umidade_solo"),
-            int(bool(dados.get("nivel_baixo"))),
-            int(bool(dados.get("nivel_alto")))
-        ]
-        for n in PINS.keys():
-            row.append(int(bool(estado_reles[n])))
-        for n in PINS.keys():
-            row.append(int(bool(feedbacks[f"{n}_fb_ativado"])))
-            row.append(int(bool(feedbacks[f"{n}_fb_desativado"])))
-        for a in alarmes.keys():
-            row.append(int(bool(alarmes[a])))
-    with open(CSV_FILE, "a", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(row)
+    estado_path = os.path.join(DATA_DIR,"estado.json")
+    with open(estado_path, "w") as f:
+        json.dump(entry, f, indent=2)
+
+    registros_path = os.path.join(DATA_DIR,"registros.json")
+
+    if os.path.isfile(registros_path):
+        with open(registros_path, "r") as f:
+           try:
+               historico = json.load(f)
+               if not isinstance(historico, list):
+                   historico = []
+           except Exception:
+               historico = []
+
+    else:
+        historico = []
+
+    historico.append(entry)
+
+    with open(registros_path, "w") as f:
+        json.dump(historico, f,indent=2)
+
+
+
+
 
 def atualizar_hardware(nome, estado: bool):
     if nome not in PINS:
@@ -375,7 +407,7 @@ async def servidor_opcua():
                     for n in PINS.keys():
                         atualizar_hardware(n, False)
 
-                registrar_csv_row()
+                registrar_json_row()
                 await asyncio.sleep(60)
             except Exception:
                 logger.exception("Erro no loop OPC UA")
@@ -385,7 +417,6 @@ async def servidor_opcua():
 # MAIN
 # -------------------------
 def main():
-    registrar_csv_once_header()
     iniciar_mqtt()
     loop = asyncio.get_event_loop()
     try:
