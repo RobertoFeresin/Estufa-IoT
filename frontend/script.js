@@ -377,7 +377,7 @@ function updateConnectionStatus() {
 
 async function checkSystemReady() {
   try {
-    const response = await fetch(`${API}/dados?limit=1`);
+    const response = await fetch(`${API}/registros?limit=1`);
     if (response.ok) {
       state.systemReady = true;
       state.connectionStatus = 'connected';
@@ -550,7 +550,7 @@ async function tick() {
   try {
     console.log('🔄 Buscando dados do servidor...');
     
-    const response = await fetch(`${API}/dados?limit=20`);
+    const response = await fetch(`${API}/registros?limit=20`);
     
     if (!response.ok) {
       throw new Error(`Erro HTTP: ${response.status}`);
