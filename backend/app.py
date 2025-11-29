@@ -390,7 +390,6 @@ Seja útil, técnico mas acessível, e sempre baseie suas respostas nos dados di
 # =========================
 # FUNÇÕES DE INICIALIZAÇÃO
 # =========================
-
 def fetch_external_data(endpoint="/registros", params=None):
     """Busca dados no servidor externo com autenticação."""
     try:
@@ -409,6 +408,9 @@ def fetch_external_data(endpoint="/registros", params=None):
     except Exception as e:
         print(f"DEBUG: Exceção ao buscar dados em {endpoint}: {e}")
         return None
+
+app = Flask(__name__)
+CORS(app, origins=["*"], methods=["GET", "POST"], allow_headers=["Content-Type"])
 
 def process_initial_data(data):
     """Processa dados iniciais e popula o cache."""
@@ -1091,6 +1093,46 @@ def debug():
 # =========================
 # ROTAS DE DADOS / CSV
 # =========================
+
+@app.route("/registros")
+def registros():
+    """Rota para compatibilidade com o frontend - retorna dados dos sensores"""
+    limit = int(request.args.get("limit", 20))
+    try:
+        if not system_ready:
+            return jsonify([])
+
+        data = fetch_external_data("/registros", {"limit": limit})
+        if data:
+            processed_data = []
+            for item in data:
+                try:
+                    temp = float(item.get("temperatura", 0))
+                    umid = float(item.get("umidade", 0))
+                    lum = float(item.get("luminosidade", 0))
+                    nivel_agua = 100.0 if item.get("nivel_alto") else 0.0
+                    
+                    processed_data.append({
+                        "timestamp": item.get("timestamp", ""),
+                        "temperatura": temp,
+                        "umidade": umid,
+                        "luminosidade": lum,
+                        "nivel_reservatorio": nivel_agua
+                    })
+                except (ValueError, TypeError):
+                    continue
+
+            return jsonify(processed_data)
+
+        # Fallback para cache se não conseguir dados externos
+        if len(data_cache['dados']) >= 20:
+            return jsonify(data_cache['dados'][-limit:])
+        else:
+            return jsonify([])
+
+    except Exception as e:
+        print(f"DEBUG: Erro em /registros: {e}")
+        return jsonify([])
 
 @app.route("/dados")
 def dados():

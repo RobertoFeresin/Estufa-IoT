@@ -1,4 +1,4 @@
-const API = `http://192.168.68.111:5000`;
+const API = `http://localhost:5000`;
 
 const els = {
   loginModal: document.getElementById('loginModal'),
