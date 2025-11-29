@@ -16,7 +16,6 @@ def analisar(logs):
     tstats = _stats(temps)
     ustats = _stats(umis)
 
-    # Detectorzinho simples de picos (z-score ~ fake sem std real)
     def spikes(vs, thr=2.5):
         if len(vs) < 5:
             return []

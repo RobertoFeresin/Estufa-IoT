@@ -404,11 +404,11 @@ function processDataForChart(dados) {
   }
 
   try {
-    const dadosOrdenados = [...dados].sort((a, b) => new Date(a.time || a.timestamp) - new Date(b.time || b.timestamp));
+    const dadosOrdenados = [...dados].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const dadosLimitados = dadosOrdenados.slice(-20);
     
     const labels = dadosLimitados.map(item => {
-      const date = new Date(item.time || item.timestamp);
+      const date = new Date(item.timestamp);
       return date.toLocaleTimeString('pt-BR', { 
         hour: '2-digit', 
         minute: '2-digit',
@@ -474,11 +474,11 @@ function updateTable(dados) {
   if (!dados || !Array.isArray(dados)) return;
 
   try {
-    const dadosOrdenados = [...dados].sort((a, b) => new Date(b.time || b.timestamp) - new Date(a.time || a.timestamp));
+    const dadosOrdenados = [...dados].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
     els.tbody.innerHTML = dadosOrdenados.map(item => `
       <tr>
-        <td>${new Date(item.time || item.timestamp).toLocaleTimeString('pt-BR', { 
+        <td>${new Date(item.timestamp).toLocaleTimeString('pt-BR', { 
           hour: '2-digit', 
           minute: '2-digit',
           second: '2-digit'
@@ -633,7 +633,7 @@ async function enviarChat() {
       downloadDiv.innerHTML = `
         <div class="download-card">
           <div class="download-info">
-            <h4>Relatório Gerado</h4>
+            <h4>📊 Relatório Gerado</h4>
             <p>Dados completos da estufa + análise inteligente</p>
             <a href="${API}${data.url_download}" class="download-btn" download>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -655,7 +655,7 @@ async function enviarChat() {
   } catch (err) {
     console.error('Erro no chat:', err);
     thinking.remove();
-    addMessageToChat('Erro ao processar sua mensagem. Tente novamente.', 'bot');
+    addMessageToChat('❌ Erro ao processar sua mensagem. Tente novamente.', 'bot');
   } finally {
     els.chatInput.disabled = false;
     els.btnChat.disabled = false;
@@ -721,6 +721,5 @@ function showTypingIndicator() {
   return thinking;
 }
 
-// Debug global
 window.estufaData = state.estufaData;
 window.state = state;

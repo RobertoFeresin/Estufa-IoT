@@ -24,7 +24,7 @@ PASSWORD = "12345"
 credentials = base64.b64encode(f"{USERNAME}:{PASSWORD}".encode()).decode()
 AUTH_HEADER = {"Authorization": f"Basic {credentials}"}
 
-# URL do Ollama (AGORA INTEGRADA)
+# URL do Ollama
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434/api/chat")
 
 app = Flask(__name__)
@@ -49,7 +49,7 @@ data_cache = {
 system_ready = False
 
 # =========================
-# PARÂMETROS AGRONÔMICOS (TOMATE CEREJA / RAMI 4.0 VIEW)
+# PARÂMETROS AGRONÔMICOS (TOMATE CEREJA)
 # =========================
 
 def get_estufa_parameters():
@@ -314,7 +314,7 @@ def gerar_analise_preditiva_colheita(dados_estufa):
     return "\n".join(analise)
 
 # =========================
-# INTEGRAÇÃO OLLAMA (NOVA SEÇÃO)
+# INTEGRAÇÃO OLLAMA
 # =========================
 
 def chamar_ollama(mensagem_usuario, dados_estufa=None, historico_conversa=None):
@@ -329,12 +329,9 @@ def chamar_ollama(mensagem_usuario, dados_estufa=None, historico_conversa=None):
 Dados atuais da estufa:
 - Temperatura: {dados_estufa.get('mediaTemperatura', 'N/A'):.1f}°C (min: {dados_estufa.get('minTemperatura', 'N/A'):.1f}°C, max: {dados_estufa.get('maxTemperatura', 'N/A'):.1f}°C)
 - Umidade: {dados_estufa.get('mediaUmidade', 'N/A'):.1f}% (min: {dados_estufa.get('minUmidade', 'N/A'):.1f}%, max: {dados_estufa.get('maxUmidade', 'N/A'):.1f}%)
-- Luminosidade: {dados_estufa.get('mediaLuminosidade', 'N/A'):.1f} µmol/m²/s
+- Luminosidade: {dados_estufa.get('mediaLuminosidade', 'N/A'):.1f} lux
 - Umidade do solo: {dados_estufa.get('mediaUmidadeSolo', 'N/A'):.1f}%
-- pH do solo: {dados_estufa.get('mediaPHSolo', 'N/A'):.1f}
-- EC do solo: {dados_estufa.get('mediaECSolo', 'N/A'):.1f} mS/cm
-- CO₂: {dados_estufa.get('mediaCO2', 'N/A'):.1f} ppm
-- Nível da água: {dados_estufa.get('mediaNivelAgua', 'N/A'):.1f}%
+- Nível de água: {dados_estufa.get('mediaNivelAgua', 'N/A'):.1f}%
 """
         
         # Preparar histórico de conversa
@@ -423,10 +420,15 @@ def process_initial_data(data):
         try:
             temp = float(item.get("temperatura", 0))
             umid = float(item.get("umidade", 0))
+            lum = float(item.get("luminosidade", 0))
+            nivel_agua = float(item.get("nivel_alto", 0)) if item.get("nivel_alto") is not None else 0
+            
             processed_data.append({
-                "time": item.get("timestamp", ""),
+                "timestamp": item.get("timestamp", ""),
                 "temperatura": temp,
-                "umidade": umid
+                "umidade": umid,
+                "luminosidade": lum,
+                "nivel_reservatorio": nivel_agua
             })
         except (ValueError, TypeError):
             continue
@@ -588,19 +590,38 @@ def obter_dados_estufa_atual(limit=50):
         "umidade": [],
         "luminosidade": [],
         "nivel_reservatorio": [],
-        "co2": [],
-        "umidade_solo": [],
-        "ph_solo": [],
-        "ec_solo": [],
     }
 
     for p in data:
-        for chave in agregados.keys():
-            if chave in p and p[chave] is not None:
-                try:
-                    agregados[chave].append(float(p[chave]))
-                except (ValueError, TypeError):
-                    continue
+        # Temperatura
+        if p.get("temperatura") is not None:
+            try:
+                agregados["temperatura"].append(float(p["temperatura"]))
+            except (ValueError, TypeError):
+                pass
+        
+        # Umidade
+        if p.get("umidade") is not None:
+            try:
+                agregados["umidade"].append(float(p["umidade"]))
+            except (ValueError, TypeError):
+                pass
+        
+        # Luminosidade
+        if p.get("luminosidade") is not None:
+            try:
+                agregados["luminosidade"].append(float(p["luminosidade"]))
+            except (ValueError, TypeError):
+                pass
+        
+        # Nível de água - usando nivel_alto como indicador (0=baixo, 1=alto)
+        if p.get("nivel_alto") is not None:
+            try:
+                # Converter para porcentagem: 0 = 0%, 1 = 100%
+                nivel = 100.0 if p["nivel_alto"] else 0.0
+                agregados["nivel_reservatorio"].append(nivel)
+            except (ValueError, TypeError):
+                pass
 
     resultado = {}
     for chave, valores in agregados.items():
@@ -626,14 +647,6 @@ def obter_dados_estufa_atual(limit=50):
             resultado["mediaNivelAgua"] = media
             resultado["minNivelAgua"] = minimo
             resultado["maxNivelAgua"] = maximo
-        elif chave == "co2":
-            resultado["mediaCO2"] = media
-        elif chave == "umidade_solo":
-            resultado["mediaUmidadeSolo"] = media
-        elif chave == "ph_solo":
-            resultado["mediaPHSolo"] = media
-        elif chave == "ec_solo":
-            resultado["mediaECSolo"] = media
 
     return resultado
 
@@ -718,10 +731,6 @@ def avaliar_variaveis_ambiente(dados_estufa):
     avaliacao["temperatura"] = avalia("mediaTemperatura", "temperatura")
     avaliacao["umidade"] = avalia("mediaUmidade", "umidade")
     avaliacao["luminosidade"] = avalia("mediaLuminosidade", "luminosidade")
-    avaliacao["umidade_solo"] = avalia("mediaUmidadeSolo", "umidade_solo")
-    avaliacao["ph_solo"] = avalia("mediaPHSolo", "ph_solo")
-    avaliacao["ec_solo"] = avalia("mediaECSolo", "ec_solo")
-    avaliacao["co2"] = avalia("mediaCO2", "co2")
 
     if scores:
         indice_qualidade = sum(scores) / len(scores)
@@ -741,14 +750,14 @@ def gerar_resposta_temperatura(dados_estufa):
     
     avaliacao = avaliar_variavel_individual("temperatura", temp_atual)
     
-    resposta = f"Temperatura atual: {temp_atual:.1f}°C\n"
-    resposta += f"Variação: {temp_min:.1f}°C a {temp_max:.1f}°C\n\n"
+    resposta = f"🌡️ Temperatura atual: {temp_atual:.1f}°C\n"
+    resposta += f"📊 Variação: {temp_min:.1f}°C a {temp_max:.1f}°C\n\n"
     
     if avaliacao:
         resposta += f"{avaliacao['emoji']} Status: {avaliacao['status']}\n"
-        resposta += f"Faixa ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']}°C\n"
+        resposta += f"🎯 Faixa ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']}°C\n"
         if avaliacao['acao']:
-            resposta += f"Recomendação: {avaliacao['acao']}"
+            resposta += f"💡 Recomendação: {avaliacao['acao']}"
     
     return resposta
 
@@ -763,14 +772,14 @@ def gerar_resposta_umidade(dados_estufa):
     
     avaliacao = avaliar_variavel_individual("umidade", umid_atual)
     
-    resposta = f"Umidade atual: {umid_atual:.1f}%\n"
-    resposta += f"Variação: {umid_min:.1f}% a {umid_max:.1f}%\n\n"
+    resposta = f"💧 Umidade atual: {umid_atual:.1f}%\n"
+    resposta += f"📊 Variação: {umid_min:.1f}% a {umid_max:.1f}%\n\n"
     
     if avaliacao:
         resposta += f"{avaliacao['emoji']} Status: {avaliacao['status']}\n"
-        resposta += f" Faixa ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']}%\n"
+        resposta += f"🎯 Faixa ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']}%\n"
         if avaliacao['acao']:
-            resposta += f"Recomendação: {avaliacao['acao']}"
+            resposta += f"💡 Recomendação: {avaliacao['acao']}"
     
     return resposta
 
@@ -785,67 +794,14 @@ def gerar_resposta_luminosidade(dados_estufa):
     
     avaliacao = avaliar_variavel_individual("luminosidade", lum_atual)
     
-    resposta = f"Luminosidade atual: {lum_atual:.1f} µmol/m²/s\n"
-    resposta += f"Variação: {lum_min:.1f} a {lum_max:.1f} µmol/m²/s\n\n"
+    resposta = f"☀️ Luminosidade atual: {lum_atual:.1f} lux\n"
+    resposta += f"📊 Variação: {lum_min:.1f} a {lum_max:.1f} lux\n\n"
     
     if avaliacao:
         resposta += f"{avaliacao['emoji']} Status: {avaliacao['status']}\n"
-        resposta += f" Faixa ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']} µmol/m²/s\n"
+        resposta += f"🎯 Faixa ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']} lux\n"
         if avaliacao['acao']:
-            resposta += f"Recomendação: {avaliacao['acao']}"
-    
-    return resposta
-
-def gerar_resposta_solo(dados_estufa):
-    """Gera resposta específica para condições do solo."""
-    resposta = "🌱 Condições do solo:\n\n"
-    
-    if dados_estufa.get("mediaUmidadeSolo"):
-        umid_solo = dados_estufa["mediaUmidadeSolo"]
-        avaliacao = avaliar_variavel_individual("umidade_solo", umid_solo)
-        resposta += f" Umidade do solo: {umid_solo:.1f}%\n"
-        if avaliacao:
-            resposta += f"   {avaliacao['emoji']} {avaliacao['status']} (Ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']}%)\n"
-            if avaliacao['acao']:
-                resposta += f"    {avaliacao['acao']}\n"
-        resposta += "\n"
-    
-    if dados_estufa.get("mediaPHSolo"):
-        ph_solo = dados_estufa["mediaPHSolo"]
-        avaliacao = avaliar_variavel_individual("ph_solo", ph_solo)
-        resposta += f"🧪 pH do solo: {ph_solo:.1f}\n"
-        if avaliacao:
-            resposta += f"   {avaliacao['emoji']} {avaliacao['status']} (Ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']})\n"
-            if avaliacao['acao']:
-                resposta += f"    {avaliacao['acao']}\n"
-        resposta += "\n"
-    
-    if dados_estufa.get("mediaECSolo"):
-        ec_solo = dados_estufa["mediaECSolo"]
-        avaliacao = avaliar_variavel_individual("ec_solo", ec_solo)
-        resposta += f"⚡ Condutividade (EC): {ec_solo:.1f} mS/cm\n"
-        if avaliacao:
-            resposta += f"   {avaliacao['emoji']} {avaliacao['status']} (Ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']} mS/cm)\n"
-            if avaliacao['acao']:
-                resposta += f"    {avaliacao['acao']}\n"
-    
-    return resposta
-
-def gerar_resposta_co2(dados_estufa):
-    """Gera resposta específica para CO₂."""
-    if not dados_estufa.get("mediaCO2"):
-        return " Não tenho dados de CO₂ no momento."
-    
-    co2_atual = dados_estufa["mediaCO2"]
-    avaliacao = avaliar_variavel_individual("co2", co2_atual)
-    
-    resposta = f"CO₂ atual: {co2_atual:.1f} ppm\n\n"
-    
-    if avaliacao:
-        resposta += f"{avaliacao['emoji']} Status: {avaliacao['status']}\n"
-        resposta += f" Faixa ideal: {avaliacao['ideal_min']}–{avaliacao['ideal_max']} ppm\n"
-        if avaliacao['acao']:
-            resposta += f" Recomendação: {avaliacao['acao']}"
+            resposta += f"💡 Recomendação: {avaliacao['acao']}"
     
     return resposta
 
@@ -858,7 +814,7 @@ def gerar_resposta_nivel_agua(dados_estufa):
     nivel_min = dados_estufa.get("minNivelAgua", nivel)
     nivel_max = dados_estufa.get("maxNivelAgua", nivel)
     
-    resposta = f" Nível de água: {nivel:.1f}%\n"
+    resposta = f"💧 Nível de água: {nivel:.1f}%\n"
     resposta += f"📊 Variação: {nivel_min:.1f}% a {nivel_max:.1f}%\n\n"
     
     if nivel < 20:
@@ -889,22 +845,22 @@ def is_complete_analysis_query(mensagem_lower):
     return any(p in mensagem_lower for p in palavras_completas)
 
 # =========================
-# LÓGICA DO CHAT / AGENTE (ATUALIZADA)
+# LÓGICA DO CHAT / AGENTE
 # =========================
 
 def gerar_resposta_analitica_completa(dados_estufa):
     """Gera a análise completa (apenas quando explicitamente solicitada)."""
     if not dados_estufa or not dados_estufa.get("mediaTemperatura"):
-        return " Não tenho dados suficientes para uma análise completa."
+        return "Não tenho dados suficientes para uma análise completa."
 
     # Usar a função de avaliação correta
     avaliacao, indice = avaliar_variaveis_ambiente(dados_estufa)
     texto_colheita = gerar_texto_colheita_tomate(indice)
 
     resposta = []
-    resposta.append("RELATÓRIO COMPLETO DA ESTUFA")
+    resposta.append("📊 RELATÓRIO COMPLETO DA ESTUFA")
     resposta.append("")
-    resposta.append(f" Índice de qualidade: {indice*10:.1f}/10")
+    resposta.append(f"⭐ Índice de qualidade: {indice*10:.1f}/10")
     resposta.append("")
 
     # Adicionar análise de cada variável
@@ -913,30 +869,36 @@ def gerar_resposta_analitica_completa(dados_estufa):
         emoji = "🔵" if temp['status'] == "BAIXO" else "🔴" if temp['status'] == "ALTO" else "✅" if temp['status'] == "IDEAL" else "🟡"
         resposta.append(f"{emoji} Temperatura: {temp['media']:.1f}°C | {temp['status']}")
         if temp['acao']:
-            resposta.append(f"    {temp['acao']}")
+            resposta.append(f"   💡 {temp['acao']}")
+        resposta.append("")
     
     if avaliacao.get("umidade"):
         umid = avaliacao["umidade"]
         emoji = "🔵" if umid['status'] == "BAIXO" else "🔴" if umid['status'] == "ALTO" else "✅" if umid['status'] == "IDEAL" else "🟡"
         resposta.append(f"{emoji} Umidade: {umid['media']:.1f}% | {umid['status']}")
         if umid['acao']:
-            resposta.append(f"    {umid['acao']}")
+            resposta.append(f"   💡 {umid['acao']}")
+        resposta.append("")
     
     if avaliacao.get("luminosidade"):
         lum = avaliacao["luminosidade"]
         emoji = "🔵" if lum['status'] == "BAIXO" else "🔴" if lum['status'] == "ALTO" else "✅" if lum['status'] == "IDEAL" else "🟡"
-        resposta.append(f"{emoji} Luminosidade: {lum['media']:.1f} µmol/m²/s | {lum['status']}")
+        resposta.append(f"{emoji} Luminosidade: {lum['media']:.1f} lux | {lum['status']}")
         if lum['acao']:
-            resposta.append(f"    {lum['acao']}")
-    
-    if avaliacao.get("umidade_solo"):
-        solo = avaliacao["umidade_solo"]
-        emoji = "🔵" if solo['status'] == "BAIXO" else "🔴" if solo['status'] == "ALTO" else "✅" if solo['status'] == "IDEAL" else "🟡"
-        resposta.append(f"{emoji} Umidade do solo: {solo['media']:.1f}% | {solo['status']}")
-        if solo['acao']:
-            resposta.append(f"    {solo['acao']}")
+            resposta.append(f"   💡 {lum['acao']}")
+        resposta.append("")
 
-    resposta.append("")
+    # Nível de água
+    if dados_estufa.get("mediaNivelAgua"):
+        nivel = dados_estufa["mediaNivelAgua"]
+        if nivel < 20:
+            resposta.append("🔴 Nível de água: CRÍTICO - Abastecer reservatório")
+        elif nivel < 40:
+            resposta.append("🟡 Nível de água: MODERADO - Monitorar")
+        else:
+            resposta.append("✅ Nível de água: ADEQUADO")
+        resposta.append("")
+
     resposta.append(texto_colheita)
 
     return "\n".join(resposta)
@@ -958,28 +920,22 @@ def gerar_resposta_especifica(mensagem_lower, dados_estufa):
     elif any(p in mensagem_lower for p in ['luminosidade', 'luz', 'luminosa', 'claro', 'escuro']):
         return gerar_resposta_luminosidade(dados_estufa)
     
-    elif any(p in mensagem_lower for p in ['solo', 'ph', 'ec', 'condutividade', 'terra']):
-        return gerar_resposta_solo(dados_estufa)
-    
-    elif any(p in mensagem_lower for p in ['co2', 'carbono', 'gás', 'gas']):
-        return gerar_resposta_co2(dados_estufa)
-    
     elif any(p in mensagem_lower for p in ['água', 'agua', 'nivel', 'nível', 'reservatorio', 'reservatório']):
         return gerar_resposta_nivel_agua(dados_estufa)
     
     elif any(p in mensagem_lower for p in ['dados', 'sensores', 'valores', 'métricas']):
         # Resumo breve dos dados disponíveis
-        resposta = "Dados disponíveis:\n\n"
+        resposta = "📈 Dados disponíveis:\n\n"
         if dados_estufa.get("mediaTemperatura"):
-            resposta += f" Temperatura: {dados_estufa['mediaTemperatura']:.1f}°C\n"
+            resposta += f"🌡️ Temperatura: {dados_estufa['mediaTemperatura']:.1f}°C\n"
         if dados_estufa.get("mediaUmidade"):
-            resposta += f" Umidade: {dados_estufa['mediaUmidade']:.1f}%\n"
+            resposta += f"💧 Umidade: {dados_estufa['mediaUmidade']:.1f}%\n"
         if dados_estufa.get("mediaLuminosidade"):
-            resposta += f"Luminosidade: {dados_estufa['mediaLuminosidade']:.1f} µmol/m²/s\n"
-        if dados_estufa.get("mediaUmidadeSolo"):
-            resposta += f"Umidade solo: {dados_estufa['mediaUmidadeSolo']:.1f}%\n"
+            resposta += f"☀️ Luminosidade: {dados_estufa['mediaLuminosidade']:.1f} lux\n"
+        if dados_estufa.get("mediaNivelAgua"):
+            resposta += f"💧 Nível de água: {dados_estufa['mediaNivelAgua']:.1f}%\n"
         
-        resposta += "\n Pergunte por uma variável específica para mais detalhes!"
+        resposta += "\n💡 Pergunte por uma variável específica para mais detalhes!"
         return resposta
     
     # Se não identificou uma variável específica, usar Ollama
@@ -993,22 +949,22 @@ def gerar_texto_colheita_tomate(indice_qualidade):
     if indice_qualidade >= 0.85:
         tipo = "acelerado"
         fator = 0.85
-        emoji = ""
+        emoji = "⚡"
     elif indice_qualidade >= 0.65:
         tipo = "normal" 
         fator = 1.0
-        emoji = ""
+        emoji = "📅"
     else:
         tipo = "lento"
         fator = 1.15
-        emoji = ""
+        emoji = "🐌"
 
     dias_min = int(ciclo_base_min * fator)
     dias_max = int(ciclo_base_max * fator)
 
     texto = []
-    texto.append(f"Projeção de colheita para tomate cereja")
-    texto.append(f"{emoji} {tipo.capitalize()} - estimativa: {dias_min} a {dias_max} dias")
+    texto.append(f"{emoji} Projeção de colheita para tomate cereja")
+    texto.append(f"📊 {tipo.capitalize()} - estimativa: {dias_min} a {dias_max} dias")
     
     return "\n".join(texto)
 
@@ -1034,33 +990,29 @@ def gerar_resposta_inteligente(mensagem, dados_estufa=None, historico_conversa=N
             if resposta_ollama and len(resposta_ollama.strip()) > 10:
                 resposta_final = resposta_ollama
         except Exception as e:
-            print(f" Fallback para regras - Erro Ollama: {e}")
+            print(f"Fallback para regras - Erro Ollama: {e}")
 
     # Fallback para sistema baseado em regras
     if not resposta_final:
         if any(p in mensagem_lower for p in ['oi', 'olá', 'ola', 'hey', 'hello', 'bom dia', 'boa tarde', 'boa noite']):
             resposta_final = (
-                "Olá! Sou o assistente inteligente da Estufa IoT.\n\n"
-                "Posso te dar informações específicas sobre:\n"
-                "• Temperatura atual e recomendações\n"
-                "• Umidade do ar e do solo\n" 
-                "• Luminosidade e condições de luz\n"
-                "• Condições do solo (pH, EC, umidade)\n"
-                "• Níveis de CO₂\n"
-                "• Nível da água no reservatório\n\n"
-                "Pergunte por exemplo: *\"qual é a temperatura?\"* ou *\"como está a umidade?\"*"
+                "👋 Olá! Sou o assistente inteligente da Estufa IoT.\n\n"
+                "🌱 Posso te dar informações específicas sobre:\n"
+                "• 🌡️ Temperatura atual e recomendações\n"
+                "• 💧 Umidade do ar\n" 
+                "• ☀️ Luminosidade e condições de luz\n"
+                "• 💧 Nível da água no reservatório\n\n"
+                "💡 Pergunte por exemplo: *\"qual é a temperatura?\"* ou *\"como está a umidade?\"*"
             )
         else:
             resposta_final = (
-                " Assistente de Estufa Inteligente\n\n"
-                "Posso te ajudar com informações específicas sobre:\n\n"
-                " Temperatura atual e histórica\n"
-                " Umidade do ar e solo\n" 
-                " Luminosidade e condições de luz\n"
-                " Análise do solo (pH, EC)\n"
-                " Níveis de CO₂\n"
-                " Nível de água\n\n"
-                "Pergunte sobre qualquer uma dessas variáveis!"
+                "🤖 Assistente de Estufa Inteligente\n\n"
+                "🌱 Posso te ajudar com informações específicas sobre:\n\n"
+                "🌡️ Temperatura atual e histórica\n"
+                "💧 Umidade do ar\n" 
+                "☀️ Luminosidade e condições de luz\n"
+                "💧 Nível de água\n\n"
+                "💡 Pergunte sobre qualquer uma dessas variáveis!"
             )
 
     # ADICIONAR ANÁLISE PREDITIVA AUTOMATICAMENTE NO FINAL
@@ -1154,12 +1106,15 @@ def dados():
                 try:
                     temp = float(item.get("temperatura", 0))
                     umid = float(item.get("umidade", 0))
+                    lum = float(item.get("luminosidade", 0))
+                    nivel_agua = 100.0 if item.get("nivel_alto") else 0.0
+                    
                     processed_data.append({
-                        "time": item.get("timestamp", ""),
+                        "timestamp": item.get("timestamp", ""),
                         "temperatura": temp,
                         "umidade": umid,
-                        "luminosidade": item.get("luminosidade"),
-                        "nivel_reservatorio": item.get("nivel_reservatorio")
+                        "luminosidade": lum,
+                        "nivel_reservatorio": nivel_agua
                     })
                 except (ValueError, TypeError):
                     continue
@@ -1284,18 +1239,19 @@ def export_csv():
             with open(export_path, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
                 w.writerow(["timestamp", "temperatura", "umidade", "luminosidade", "nivel_reservatorio",
-                            "bomba_agua", "exaustor", "ventilador", "luminaria", "emergencia"])
+                            "bomba", "valvula", "luminaria", "ventilador", "exaustor", "emergencia"])
                 for p in data:
                     w.writerow([
                         p.get("timestamp", ""),
                         p.get("temperatura", 0),
                         p.get("umidade", 0),
                         p.get("luminosidade", 0),
-                        p.get("nivel_reservatorio", 0),
-                        p.get("bomba_agua", 0),
-                        p.get("exaustor", 0),
-                        p.get("ventilador", 0),
+                        100.0 if p.get("nivel_alto") else 0.0,
+                        p.get("bomba", 0),
+                        p.get("valvula", 0),
                         p.get("luminaria", 0),
+                        p.get("ventilador", 0),
+                        p.get("exaustor", 0),
                         p.get("emergencia", 0)
                     ])
 
@@ -1342,16 +1298,16 @@ def chat():
                 session_id, conversation_history = get_or_create_session(session_id)
                 add_to_history(session_id, "user", raw_msg)
                 add_to_history(session_id, "assistant", 
-                              f"Relatório gerado com sucesso! \n\n"
-                              f"Arquivo: {dados_relatorio['arquivo']}\n"
-                              f"Contém: Dados atuais + análise completa + histórico de sensores\n\n"
-                              f"[Baixar Relatório]({dados_relatorio['caminho']})")
+                              f"📊 Relatório gerado com sucesso! \n\n"
+                              f"📁 Arquivo: {dados_relatorio['arquivo']}\n"
+                              f"📈 Contém: Dados atuais + análise completa + histórico de sensores\n\n"
+                              f"⬇️ [Baixar Relatório]({dados_relatorio['caminho']})")
                 
                 return jsonify({
-                    "resposta": f"Relatório gerado com sucesso! \n\n"
-                               f"Arquivo: {dados_relatorio['arquivo']}\n"
-                               f"Contém: Dados atuais + análise completa + histórico de sensores\n\n"
-                               f"[Baixar Relatório]({dados_relatorio['caminho']})",
+                    "resposta": f"📊 Relatório gerado com sucesso! \n\n"
+                               f"📁 Arquivo: {dados_relatorio['arquivo']}\n"
+                               f"📈 Contém: Dados atuais + análise completa + histórico de sensores\n\n"
+                               f"⬇️ [Baixar Relatório]({dados_relatorio['caminho']})",
                     "session_id": session_id,
                     "modo_ia": True,
                     "tem_relatorio": True,
@@ -1359,7 +1315,7 @@ def chat():
                 })
             else:
                 return jsonify({
-                    "resposta": "Desculpe, não consegui gerar o relatório no momento. Tente novamente mais tarde.",
+                    "resposta": "❌ Desculpe, não consegui gerar o relatório no momento. Tente novamente mais tarde.",
                     "session_id": session_id,
                     "modo_ia": False
                 })
@@ -1383,7 +1339,7 @@ def chat():
             )
         except Exception as e:
             print(f"Erro ao gerar resposta: {e}")
-            resposta = "Olá! Sou o assistente da Estufa IoT. Posso te ajudar com informações sobre temperatura, umidade, luminosidade e outras condições da estufa. Pergunte algo como 'qual é a temperatura?'"
+            resposta = "👋 Olá! Sou o assistente da Estufa IoT. Posso te ajudar com informações sobre temperatura, umidade, luminosidade e outras condições da estufa. Pergunte algo como 'qual é a temperatura?'"
 
         # Histórico
         add_to_history(session_id, "user", raw_msg)
@@ -1398,7 +1354,7 @@ def chat():
     except Exception as e:
         print(f"DEBUG: Erro geral em /chat: {e}")
         return jsonify({
-            "resposta": "Olá! Sou o assistente da Estufa IoT. Como posso ajudar você hoje?",
+            "resposta": "👋 Olá! Sou o assistente da Estufa IoT. Como posso ajudar você hoje?",
             "modo_ia": False
         })
 
@@ -1512,7 +1468,7 @@ def gerar_relatorio():
             if dados_estufa.get("mediaUmidade"):
                 writer.writerow(["Umidade média:", f"{dados_estufa['mediaUmidade']:.1f}%"])
             if dados_estufa.get("mediaLuminosidade"):
-                writer.writerow(["Luminosidade média:", f"{dados_estufa['mediaLuminosidade']:.1f} µmol/m²/s"])
+                writer.writerow(["Luminosidade média:", f"{dados_estufa['mediaLuminosidade']:.1f} lux"])
             if dados_estufa.get("mediaNivelAgua"):
                 writer.writerow(["Nível de água médio:", f"{dados_estufa['mediaNivelAgua']:.1f}%"])
             writer.writerow([])
@@ -1526,7 +1482,7 @@ def gerar_relatorio():
             
             # Dados completos
             writer.writerow(["DADOS COMPLETOS DOS SENSORES"])
-            writer.writerow(["Timestamp", "Temperatura", "Umidade", "Luminosidade", "Nível Água", "CO2", "Umidade Solo", "pH Solo", "EC Solo"])
+            writer.writerow(["Timestamp", "Temperatura", "Umidade", "Luminosidade", "Nível Água", "Bomba", "Válvula", "Luminária", "Ventilador", "Exaustor", "Emergência"])
             
             for registro in dados_completos:
                 writer.writerow([
@@ -1534,11 +1490,13 @@ def gerar_relatorio():
                     registro.get("temperatura", ""),
                     registro.get("umidade", ""),
                     registro.get("luminosidade", ""),
-                    registro.get("nivel_reservatorio", ""),
-                    registro.get("co2", ""),
-                    registro.get("umidade_solo", ""),
-                    registro.get("ph_solo", ""),
-                    registro.get("ec_solo", "")
+                    100.0 if registro.get("nivel_alto") else 0.0,
+                    registro.get("bomba", ""),
+                    registro.get("valvula", ""),
+                    registro.get("luminaria", ""),
+                    registro.get("ventilador", ""),
+                    registro.get("exaustor", ""),
+                    registro.get("emergencia", "")
                 ])
         
         # Adicionar ao histórico do chat se houver sessão
