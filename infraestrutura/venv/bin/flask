@@ -1,4 +1,4 @@
-#!/home/pi4b/Desktop/estufa/venv/bin/python3
+#!/home/pi4b/Desktop/Estufa-IoT/infraestrutura/venv/bin/python3
 import sys
 from flask.cli import main
 if __name__ == '__main__':

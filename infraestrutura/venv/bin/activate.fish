@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/pi4b/Desktop/Estufa-Iot/infraestrutura/venv
+set -gx VIRTUAL_ENV /home/pi4b/Desktop/Estufa-IoT/infraestrutura/venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH

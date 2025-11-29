@@ -1,4 +1,4 @@
-#!/home/pi4b/Desktop/Estufa-Iot/infraestrutura/venv/bin/python3
+#!/home/pi4b/Desktop/Estufa-IoT/infraestrutura/venv/bin/python3
 # -*- coding: utf-8 -*-
 """
 Estufa Inteligente - Bridge MQTT -> OPC UA + Controle GPIO + CSV
@@ -18,7 +18,7 @@ import threading
 from datetime import datetime
 
 
-EXPECTED_PYTHON = "/home/pi4b/Desktop/Estufa-Iot/infraestrutura/venv/bin/python3"
+EXPECTED_PYTHON = "/home/pi4b/Desktop/Estufa-IoT/infraestrutura/venv/bin/python3"
 if sys.executable != EXPECTED_PYTHON:
     print(f"[AVISO] Recomenda-se executar com: {EXPECTED_PYTHON} (python atual: {sys.executable})")
 
@@ -54,7 +54,7 @@ except Exception:
 # -------------------------
 # Paths / logging / csv
 # -------------------------
-BASE_DIR = "/home/pi4b/Desktop/Estufa-Iot/infraestrutura"
+BASE_DIR = "/home/pi4b/Desktop/Estufa-IoT/infraestrutura"
 DATA_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(BASE_DIR, exist_ok=True)
 LOG_DIR = os.path.join(BASE_DIR, "logs")
@@ -335,7 +335,14 @@ async def servidor_opcua():
 
     sensor_vars = {}
     for k in ["temperatura", "umidade", "luminosidade", "umidade_solo", "nivel_baixo", "nivel_alto"]:
-        sensor_vars[k] = await obj.add_variable(ns, k, dados.get(k, 0.0))
+        initial = dados.get(k)
+        if initial is None:
+            initial = 0.0
+        if isinstance(initial, bool):
+            initial = 1.0 if initial else 0.0
+        initial = float(initial)
+
+        sensor_vars[k] = await obj.add_variable(ns, k, initial)
         await sensor_vars[k].set_writable(False)
 
     setpoint_vars = {}
@@ -377,7 +384,17 @@ async def servidor_opcua():
                 atualizar_alarmes()
                 with data_lock:
                     for k, var in sensor_vars.items():
-                        await var.write_value(dados.get(k))
+                        value = dados.get(k)
+
+                        if value is None:
+                            value = 0.0
+                        if isinstance(value,bool):
+                            value = 1.0 if value else 0.0
+                        try:
+                            value = float(value)
+                        except:
+                            value = 0.0
+                        await var.write_value(value)
                 for n, var in rele_state_vars.items():
                     await var.write_value(estado_reles[n])
                 for name, var in feedback_vars.items():
