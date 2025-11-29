@@ -40,7 +40,7 @@ fi
 # 3. Ativar venv e instalar libs (compatível com Raspberry Pi Bookworm)
 source venv/bin/activate
 pip install --upgrade pip --break-system-packages
-pip install paho-mqtt opcua pandas influxdb-client flask --break-system-packages
+pip install paho-mqtt opcua pandas influxdb-client flask asyncua --break-system-packages
 
 # Verificação final das libs CORRIGIDA
 missing_libs=$(python3 - <<'EOF'
