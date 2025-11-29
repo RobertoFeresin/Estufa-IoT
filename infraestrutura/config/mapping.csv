@@ -1,0 +1,10 @@
+Tag,Role,DataType,Unit,Description
+Temperatura,measurement,FLOAT,degC,Temperatura do ar
+Umidade,measurement,FLOAT,%,Umidade relativa do ar
+Luminosidade,measurement,FLOAT,lux,Luminosidade
+NivelReservatorio,measurement,FLOAT,cm,Nível do reservatório
+BombaAgua,command,BOOL,,Acionamento bomba
+Luminaria,command,BOOL,,Acionamento luminaria
+Ventilador,command,BOOL,,Acionamento ventilador
+Exaustor,command,BOOL,,Acionamento exaustor
+Emergencia,feedback,BOOL,,Estado de emergencia

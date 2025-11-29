@@ -1,36 +1,68 @@
-# Logs
+# ===================================
+# LOGS
+# ===================================
 *.log
 *.out
 *.err
 
-# Python
+# ===================================
+# PYTHON
+# ===================================
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
+*.pydgi
 *.sqlite3
 
+# Virtual environments
+venv/
+*/venv/
+infraestrutura/venv/
+
+# ===================================
 # VSCode
+# ===================================
 .vscode/
 *.code-workspace
 
-# Node
+# ===================================
+# NODE / FRONTEND
+# ===================================
 frontend/node_modules/
 frontend/dist/
 
-# InfluxDB data (binários do banco)
+# ===================================
+# ESTUFA IOT - ARQUIVOS GERADOS
+# NÃO VERSIONAR NUNCA
+# ===================================
+infraestrutura/data/
+infraestrutura/data/*
+infraestrutura/data/**/*.json
+
+# Se quiser manter a pasta vazia:
+# !infraestrutura/data/.gitkeep
+
+# ===================================
+# BANCO INFLUXDB (binários)
+# ===================================
 data/data/
 data/meta/
 data/wal/
 
-# Arquivos exportados (podem ser gerados de novo)
+# ===================================
+# ARQUIVOS EXPORTADOS
+# ===================================
 data/exports/*.csv
 
-# Podman / Docker
+# ===================================
+# PODMAN / DOCKER
+# ===================================
 *.pid
 *.sock
 
-# Sistema
+# ===================================
+# SISTEMA/OS
+# ===================================
 .DS_Store
 Thumbs.db
 
@@ -46,3 +78,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# ===================================
+# OUTROS
+# ===================================
+package-lock.json

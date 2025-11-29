@@ -35,13 +35,3 @@ def ler_dados(host: str, db: str, limit: int = 100):
         p["temperatura"] = float(p.get("temperatura", 0.0))
         p["umidade"] = float(p.get("umidade", 0.0))
     return pts
-
-def exportar_csv(path: str, host: str, db: str, limit: int = 1000):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    pts = ler_dados(host, db, limit)
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["time", "temperatura", "umidade"])
-        for p in pts:
-            w.writerow([p["time"], p["temperatura"], p["umidade"]])
-    return len(pts)
