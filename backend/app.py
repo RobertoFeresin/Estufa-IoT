@@ -10,6 +10,10 @@ import base64
 import uuid
 from datetime import datetime, timedelta
 import random
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor(max_workers=2)
 
 # =========================
 # CONFIGURAÇÕES BÁSICAS
@@ -1131,48 +1135,6 @@ def registros():
         print(f"DEBUG: Erro em /registros: {e}")
         return jsonify([])
 
-@app.route("/registros")
-def dados():
-    limit = int(request.args.get("limit", 20))
-    try:
-        if not system_ready:
-            return jsonify([])
-
-        data = fetch_external_data("/registros", {"limit": limit})
-        if data:
-            processed_data = []
-            for item in data:
-                try:
-                    temp = float(item.get("temperatura", 0))
-                    umid = float(item.get("umidade", 0))
-                    lum = float(item.get("luminosidade", 0))
-                    nivel_agua = 100.0 if item.get("nivel_alto") else 0.0
-                    
-                    processed_data.append({
-                        "timestamp": item.get("timestamp", ""),
-                        "temperatura": temp,
-                        "umidade": umid,
-                        "luminosidade": lum,
-                        "nivel_reservatorio": nivel_agua
-                    })
-                except (ValueError, TypeError):
-                    continue
-
-            if len(processed_data) >= 20:
-                data_cache['dados'] = processed_data
-                data_cache['last_update'] = time.time()
-
-            return jsonify(processed_data)
-
-        if len(data_cache['dados']) >= 20:
-            return jsonify(data_cache['dados'][-limit:])
-        else:
-            return jsonify([])
-
-    except Exception as e:
-        print(f"DEBUG: Erro em /registros: {e}")
-        return jsonify([])
-
 @app.route("/series")
 def series():
     limit = int(request.args.get("limit", 20))
@@ -1255,7 +1217,7 @@ def analise():
         print(f"DEBUG: Erro em /analise: {e}")
         return jsonify({})
 
-@app.route("/registros_completos")
+@app.route("/dados_completos")
 def dados_completos():
     limit = int(request.args.get("limit", 10))
     try:
@@ -1371,11 +1333,13 @@ def chat():
 
         # Gera resposta INTELIGENTE com tratamento de erro
         try:
-            resposta = gerar_resposta_inteligente(
+            future = executor.submit(
+                gerar_resposta_inteligente,
                 raw_msg, 
                 dados_estufa, 
                 conversation_history
             )
+            resposta = future.result(timeout=6)
         except Exception as e:
             print(f"Erro ao gerar resposta: {e}")
             resposta = "👋 Olá! Sou o assistente da Estufa IoT. Posso te ajudar com informações sobre temperatura, umidade, luminosidade e outras condições da estufa. Pergunte algo como 'qual é a temperatura?'"
