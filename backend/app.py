@@ -484,33 +484,24 @@ def initialize_system():
     global system_ready
 
     print(" Inicializando sistema...")
-    print(" Aguardando 20 dados reais do servidor externo...")
+    print(" Aguardando dados reais do servidor externo...")
 
     max_retries = 30
-    dados_coletados = 0
 
     for attempt in range(max_retries):
         try:
-            print(f"Tentativa {attempt + 1}/{max_retries} - buscando 20 dados...")
+            print(f"Tentativa {attempt + 1}/{max_retries} - buscando dados iniciais...")
             initial_data = fetch_external_data("/registros", {"limit": 20})
 
-            if initial_data and len(initial_data) >= 20:
-                dados_validos = [
-                    p for p in initial_data
-                    if float(p.get('temperatura', 0)) > 0
-                    and float(p.get('umidade', 0)) > 0
-                ]
-                if len(dados_validos) >= 20:
-                    process_initial_data(initial_data)
-                    system_ready = True
-                    dados_coletados = len(initial_data)
-                    print(" Sistema inicializado com sucesso!")
-                    print(f" Carregados {dados_coletados} registros reais")
-                    break
-                else:
-                    print(f"Dados válidos insuficientes: {len(dados_validos)}/20")
+            if initial_data:
+                process_initial_data(initial_data)
+                system_ready = True
+                print(" Sistema inicializado com sucesso!")
+                print(f" Carregados {len(initial_data)} registros reais (não precisa ser exatamente 20)")
+                break
             else:
-                print(f"Dados insuficientes recebidos: {len(initial_data) if initial_data else 0}/20")
+                print("Nenhum dado recebido nessa tentativa.")
+
         except Exception as e:
             print(f" Erro na tentativa {attempt + 1}: {e}")
 
@@ -518,14 +509,8 @@ def initialize_system():
             time.sleep(3)
 
     if not system_ready:
-        print("Sistema NÃO inicializado - não foi possível coletar 20 dados reais")
-        print("Verifique: conexão com servidor, dados disponíveis, credenciais")
-    else:
-        print(f"Sistema pronto com {dados_coletados} dados reais!")
+        print("Sistema NÃO inicializado completamente, mas seguirá tentando em tempo real.")
 
-# Thread de inicialização
-init_thread = threading.Thread(target=initialize_system, daemon=True)
-init_thread.start()
 
 # =========================
 # GERENCIAMENTO DE CONVERSAS
@@ -580,13 +565,42 @@ cleanup_thread.start()
 # ASSISTENTE AGRONÔMICO / AGENTE ANALÍTICO
 # =========================
 
+   
 def obter_dados_estufa_atual(limit=50):
     """
-    Busca dados recentes na API externa e calcula médias/min/max para as grandezas.
+    Busca dados recentes da estufa para o chat de forma RÁPIDA:
+    - Prioriza o cache (data_cache['dados']) preenchido pelas rotas /registros, /series, /analise
+    - Só chama o servidor externo se o cache estiver vazio ou muito velho
+    - Nunca bloqueia o chat se o servidor externo estiver off
     """
-    data = fetch_external_data("/registros", {"limit": limit})
-    if not data:
-        return {}
+    now = time.time()
+    base_dados = []
+
+    # 1) Tenta usar cache recente (ex: últimos 20 segundos)
+    if data_cache['dados'] and (now - data_cache['last_update'] < 20):
+        base_dados = data_cache['dados'][-limit:]
+
+    else:
+        # 2) Se cache estiver vazio ou velho, tenta buscar do servidor externo
+        try:
+            data = fetch_external_data("/registros", {"limit": limit})
+        except Exception as e:
+            print(f"DEBUG: exceção ao buscar dados recentes em obter_dados_estufa_atual: {e}")
+            data = None
+
+        if data:
+            # Usa o que veio da API externa
+            base_dados = data
+        elif data_cache['dados']:
+            # 3) Se não conseguiu buscar nada mas tem cache velho, usa cache mesmo assim
+            base_dados = data_cache['dados'][-limit:]
+        else:
+            # 4) Não tem nada pra trabalhar
+            return {}
+
+    # ==========================
+    # AGREGAÇÃO (igual você já fazia, só usando base_dados)
+    # ==========================
 
     agregados = {
         "temperatura": [],
@@ -595,41 +609,50 @@ def obter_dados_estufa_atual(limit=50):
         "nivel_reservatorio": [],
     }
 
-    for p in data:
+    for p in base_dados:
         # Temperatura
         if p.get("temperatura") is not None:
             try:
                 agregados["temperatura"].append(float(p["temperatura"]))
             except (ValueError, TypeError):
                 pass
-        
+
         # Umidade
         if p.get("umidade") is not None:
             try:
                 agregados["umidade"].append(float(p["umidade"]))
             except (ValueError, TypeError):
                 pass
-        
+
         # Luminosidade
         if p.get("luminosidade") is not None:
             try:
                 agregados["luminosidade"].append(float(p["luminosidade"]))
             except (ValueError, TypeError):
                 pass
-        
-        # Nível de água - usando nivel_alto como indicador (0=baixo, 1=alto)
-        if p.get("nivel_alto") is not None:
+
+        # Nível de água – suporta tanto 'nivel_reservatorio' quanto 'nivel_alto'
+        if "nivel_reservatorio" in p and p.get("nivel_reservatorio") is not None:
             try:
-                # Converter para porcentagem: 0 = 0%, 1 = 100%
+                agregados["nivel_reservatorio"].append(float(p["nivel_reservatorio"]))
+            except (ValueError, TypeError):
+                pass
+        elif "nivel_alto" in p and p.get("nivel_alto") is not None:
+            try:
                 nivel = 100.0 if p["nivel_alto"] else 0.0
                 agregados["nivel_reservatorio"].append(nivel)
             except (ValueError, TypeError):
                 pass
 
+    # Se ainda assim não sobrou nada, não força nada
+    if not any(agregados.values()):
+        return {}
+
     resultado = {}
     for chave, valores in agregados.items():
         if not valores:
             continue
+
         media = sum(valores) / len(valores)
         minimo = min(valores)
         maximo = max(valores)
@@ -652,6 +675,7 @@ def obter_dados_estufa_atual(limit=50):
             resultado["maxNivelAgua"] = maximo
 
     return resultado
+
 
 def avaliar_variavel_individual(nome_variavel, valor):
     """Avalia uma única variável em relação aos parâmetros ideais."""
@@ -1097,22 +1121,22 @@ def debug():
 
 @app.route("/registros")
 def registros():
-    """Rota para compatibilidade com o frontend - retorna dados dos sensores"""
+    """Rota para o frontend - retorna dados dos sensores (online + fallback)."""
     limit = int(request.args.get("limit", 20))
     try:
-        if not system_ready:
-            return jsonify([])
+        processed_data = []
 
+        # 1) Tenta sempre buscar do servidor externo
         data = fetch_external_data("/registros", {"limit": limit})
+
         if data:
-            processed_data = []
             for item in data:
                 try:
                     temp = float(item.get("temperatura", 0))
                     umid = float(item.get("umidade", 0))
                     lum = float(item.get("luminosidade", 0))
                     nivel_agua = 100.0 if item.get("nivel_alto") else 0.0
-                    
+
                     processed_data.append({
                         "timestamp": item.get("timestamp", ""),
                         "temperatura": temp,
@@ -1123,17 +1147,28 @@ def registros():
                 except (ValueError, TypeError):
                     continue
 
+        # 2) Se veio dado novo, atualiza cache e retorna
+        if processed_data:
+            data_cache['dados'] = processed_data
+            data_cache['last_update'] = time.time()
             return jsonify(processed_data)
 
-        # Fallback para cache se não conseguir dados externos
-        if len(data_cache['dados']) >= 20:
+        # 3) Se não veio nada do servidor externo, tenta usar cache
+        if data_cache['dados']:
             return jsonify(data_cache['dados'][-limit:])
-        else:
-            return jsonify([])
+
+        # 4) Último caso: realmente não tem nada ainda
+        return jsonify([])
 
     except Exception as e:
         print(f"DEBUG: Erro em /registros: {e}")
+
+        # Em caso de erro, ainda assim tenta servir do cache
+        if data_cache['dados']:
+            return jsonify(data_cache['dados'][-limit:])
+
         return jsonify([])
+
 
 @app.route("/series")
 def series():
