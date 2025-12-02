@@ -559,7 +559,6 @@ async function tick() {
     const dados = await response.json();
 
     if (!Array.isArray(dados)) {
-      console.warn("Json considerado inválido (não é array):", dados);
       throw new Error('Dados recebidos não são um array válido');
     }
 
