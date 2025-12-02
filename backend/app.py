@@ -1131,7 +1131,7 @@ def registros():
         print(f"DEBUG: Erro em /registros: {e}")
         return jsonify([])
 
-@app.route("/dados")
+@app.route("/registros")
 def dados():
     limit = int(request.args.get("limit", 20))
     try:
@@ -1170,7 +1170,7 @@ def dados():
             return jsonify([])
 
     except Exception as e:
-        print(f"DEBUG: Erro em /dados: {e}")
+        print(f"DEBUG: Erro em /registros: {e}")
         return jsonify([])
 
 @app.route("/series")
@@ -1255,7 +1255,7 @@ def analise():
         print(f"DEBUG: Erro em /analise: {e}")
         return jsonify({})
 
-@app.route("/dados_completos")
+@app.route("/registros_completos")
 def dados_completos():
     limit = int(request.args.get("limit", 10))
     try:
