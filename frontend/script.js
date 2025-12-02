@@ -6,7 +6,7 @@ const els = {
   loginForm: document.getElementById('loginForm'),
   loginError: document.getElementById('loginError'),
   logoutBtn: document.getElementById('logoutBtn'),
-  
+
   currentTemp: document.getElementById('currentTemp'),
   currentHumidity: document.getElementById('currentHumidity'),
   currentLight: document.getElementById('currentLight'),
@@ -15,13 +15,13 @@ const els = {
   humidityTrend: document.getElementById('humidityTrend'),
   lightTrend: document.getElementById('lightTrend'),
   waterTrend: document.getElementById('waterTrend'),
-  
+
   connectionStatus: document.getElementById('connectionStatus'),
   dataCount: document.getElementById('dataCount'),
-  
+
   graf: null,
   tbody: document.getElementById("tbody"),
-  
+
   mediaT: document.getElementById("mediaT"),
   mediaU: document.getElementById("mediaU"),
   mediaLight: document.getElementById("mediaLight"),
@@ -30,7 +30,7 @@ const els = {
   humidityMediaTrend: document.getElementById("humidityMediaTrend"),
   lightMediaTrend: document.getElementById("lightMediaTrend"),
   waterMediaTrend: document.getElementById("waterMediaTrend"),
-  
+
   chatInput: document.getElementById("chatInput"),
   chatBox: document.getElementById("chatBox"),
   btnChat: document.getElementById("btnChat")
@@ -73,7 +73,7 @@ function initializeApp() {
 function setupEventListeners() {
   els.loginForm.addEventListener('submit', handleLogin);
   els.logoutBtn.addEventListener('click', handleLogout);
-  
+
   els.btnChat.addEventListener('click', enviarChat);
   els.chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
@@ -84,19 +84,19 @@ function setupEventListeners() {
 
 function setupChart() {
   const ctx = document.getElementById("grafico").getContext("2d");
-  
+
   if (window.existingChart) {
     window.existingChart.destroy();
   }
-  
+
   els.graf = new Chart(ctx, {
     type: "line",
     data: {
       labels: [],
       datasets: [
-        { 
-          label: "Temperatura (°C)", 
-          data: [], 
+        {
+          label: "Temperatura (°C)",
+          data: [],
           borderWidth: 3,
           borderColor: '#00ff88',
           backgroundColor: 'rgba(0, 255, 136, 0.1)',
@@ -109,9 +109,9 @@ function setupChart() {
           pointHoverRadius: 6,
           yAxisID: 'y'
         },
-        { 
-          label: "Umidade (%)", 
-          data: [], 
+        {
+          label: "Umidade (%)",
+          data: [],
           borderWidth: 3,
           borderColor: '#00d4ff',
           backgroundColor: 'rgba(0, 212, 255, 0.1)',
@@ -124,9 +124,9 @@ function setupChart() {
           pointHoverRadius: 6,
           yAxisID: 'y1'
         },
-        { 
-          label: "Luminosidade (lux)", 
-          data: [], 
+        {
+          label: "Luminosidade (lux)",
+          data: [],
           borderWidth: 2,
           borderColor: '#fdcb6e',
           backgroundColor: 'rgba(253, 203, 110, 0.1)',
@@ -166,7 +166,7 @@ function setupChart() {
           mode: 'index',
           intersect: false,
           callbacks: {
-            label: function(context) {
+            label: function (context) {
               let label = context.dataset.label || '';
               if (label) label += ': ';
               if (context.parsed.y !== null) {
@@ -183,7 +183,7 @@ function setupChart() {
           }
         }
       },
-      scales: { 
+      scales: {
         x: {
           display: true,
           grid: {
@@ -244,25 +244,25 @@ function setupChart() {
       }
     }
   });
-  
+
   window.existingChart = els.graf;
 }
 
 function initializeLiquidBackground() {
   const canvas = document.getElementById('liquidCanvas');
   const ctx = canvas.getContext('2d');
-  
+
   function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
   }
-  
+
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
-  
+
   const particles = [];
   const particleCount = 50;
-  
+
   for (let i = 0; i < particleCount; i++) {
     particles.push({
       x: Math.random() * canvas.width,
@@ -273,27 +273,27 @@ function initializeLiquidBackground() {
       color: `rgba(0, 255, 136, ${Math.random() * 0.1 + 0.05})`
     });
   }
-  
+
   function animate() {
     ctx.fillStyle = 'rgba(10, 10, 10, 0.05)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     particles.forEach(particle => {
       particle.x += particle.speedX;
       particle.y += particle.speedY;
-      
+
       if (particle.x < 0 || particle.x > canvas.width) particle.speedX *= -1;
       if (particle.y < 0 || particle.y > canvas.height) particle.speedY *= -1;
-      
+
       ctx.beginPath();
       ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
       ctx.fillStyle = particle.color;
       ctx.fill();
     });
-    
+
     requestAnimationFrame(animate);
   }
-  
+
   animate();
 }
 
@@ -308,17 +308,17 @@ function checkAuthentication() {
 
 async function handleLogin(e) {
   e.preventDefault();
-  
+
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
   const loginBtn = e.target.querySelector('.login-btn');
-  
+
   loginBtn.classList.add('loading');
   els.loginError.textContent = '';
-  
+
   try {
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     if (username === 'admin' && password === '12345') {
       localStorage.setItem('isAuthenticated', 'true');
       showMainContent();
@@ -359,7 +359,7 @@ function showMainContent() {
 function updateConnectionStatus() {
   if (!els.connectionStatus) return;
 
-  switch(state.connectionStatus) {
+  switch (state.connectionStatus) {
     case 'checking':
       els.connectionStatus.innerHTML = 'Conectando ao servidor e coletando dados...';
       els.connectionStatus.className = 'connection-status status-checking';
@@ -382,7 +382,7 @@ async function checkSystemReady() {
       state.systemReady = true;
       state.connectionStatus = 'connected';
       updateConnectionStatus();
-      
+
       console.log("✅ Sistema pronto com dados reais");
       tick();
       setInterval(tick, 5000);
@@ -406,16 +406,16 @@ function processDataForChart(dados) {
   try {
     const dadosOrdenados = [...dados].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const dadosLimitados = dadosOrdenados.slice(-20);
-    
+
     const labels = dadosLimitados.map(item => {
       const date = new Date(item.timestamp);
-      return date.toLocaleTimeString('pt-BR', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
       });
     });
-    
+
     const temperaturas = dadosLimitados.map(item => parseFloat(item.temperatura));
     const umidades = dadosLimitados.map(item => parseFloat(item.umidade));
     const luminosidades = dadosLimitados.map(item => parseFloat(item.luminosidade || 0));
@@ -425,9 +425,9 @@ function processDataForChart(dados) {
     els.graf.data.datasets[0].data = temperaturas;
     els.graf.data.datasets[1].data = umidades;
     els.graf.data.datasets[2].data = luminosidades;
-    
+
     els.graf.update('none');
-    
+
     state.chartData = {
       labels,
       temperatura: temperaturas,
@@ -437,9 +437,9 @@ function processDataForChart(dados) {
     };
 
     document.querySelector('.chart-container').classList.remove('chart-error', 'chart-loading');
-    
+
     console.log('📊 Gráfico atualizado com', dadosLimitados.length, 'pontos de dados');
-    
+
   } catch (error) {
     console.error('Erro ao processar dados para gráfico:', error);
     document.querySelector('.chart-container').classList.add('chart-error');
@@ -475,14 +475,14 @@ function updateTable(dados) {
 
   try {
     const dadosOrdenados = [...dados].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
+
     els.tbody.innerHTML = dadosOrdenados.map(item => `
       <tr>
-        <td>${new Date(item.timestamp).toLocaleTimeString('pt-BR', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          second: '2-digit'
-        })}</td>
+        <td>${new Date(item.timestamp).toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })}</td>
         <td>sim_01</td>
         <td>${parseFloat(item.temperatura).toFixed(1)}</td>
         <td>${parseFloat(item.umidade).toFixed(1)}</td>
@@ -490,9 +490,9 @@ function updateTable(dados) {
         <td>${parseFloat(item.nivel_reservatorio || 0).toFixed(2)}</td>
       </tr>
     `).join("");
-    
+
     els.dataCount.textContent = `${dados.length} registros`;
-    
+
   } catch (error) {
     console.error('Erro ao atualizar tabela:', error);
   }
@@ -503,13 +503,13 @@ function updateTrendIndicators(currentData, previousData) {
 
   const tempChange = currentData.mediaTemperatura - previousData.mediaTemperatura;
   updateTrendElement(els.tempTrend, tempChange);
-  
+
   const humidityChange = currentData.mediaUmidade - previousData.mediaUmidade;
   updateTrendElement(els.humidityTrend, humidityChange);
-  
+
   const lightChange = currentData.mediaLuminosidade - previousData.mediaLuminosidade;
   updateTrendElement(els.lightTrend, lightChange);
-  
+
   const waterChange = currentData.mediaNivelAgua - previousData.mediaNivelAgua;
   updateTrendElement(els.waterTrend, waterChange);
 }
@@ -527,17 +527,17 @@ function updateTrendElement(element, change) {
 
 function updateCurrentValues() {
   const data = state.estufaData;
-  
+
   els.currentTemp.textContent = data.mediaTemperatura ? data.mediaTemperatura.toFixed(1) : '--';
   els.currentHumidity.textContent = data.mediaUmidade ? data.mediaUmidade.toFixed(1) : '--';
   els.currentLight.textContent = data.mediaLuminosidade ? Math.round(data.mediaLuminosidade) : '--';
   els.currentWaterLevel.textContent = data.mediaNivelAgua ? data.mediaNivelAgua.toFixed(2) : '--';
-  
+
   els.mediaT.textContent = data.mediaTemperatura ? data.mediaTemperatura.toFixed(1) : '—';
   els.mediaU.textContent = data.mediaUmidade ? data.mediaUmidade.toFixed(1) : '—';
   els.mediaLight.textContent = data.mediaLuminosidade ? Math.round(data.mediaLuminosidade) : '—';
   els.mediaWater.textContent = data.mediaNivelAgua ? data.mediaNivelAgua.toFixed(2) : '—';
-  
+
   els.tempMediaTrend.textContent = 'Estável';
   els.humidityMediaTrend.textContent = 'Estável';
   els.lightMediaTrend.textContent = 'Estável';
@@ -549,21 +549,27 @@ async function tick() {
 
   try {
     console.log('🔄 Buscando dados do servidor...');
-    
+
     const response = await fetch(`${API}/registros?limit=20`);
-    
+
     if (!response.ok) {
       throw new Error(`Erro HTTP: ${response.status}`);
     }
-    
+
     const dados = await response.json();
-    
-    if (!Array.isArray(dados) || dados.length === 0) {
+
+    if (!Array.isArray(dados)) {
+      console.warn("Json considerado inválido (não é array):", dados);
       throw new Error('Dados recebidos não são um array válido');
     }
 
+    if (dados.length === 0) {
+      console.log("📭 Nenhum dado ainda — aguardando sensores...");
+      return;
+    }
+
     console.log('✅ Dados recebidos:', dados.length, 'registros');
-    
+
     const previousData = state.previousData;
     state.previousData = { ...state.estufaData };
 
@@ -571,7 +577,7 @@ async function tick() {
     updateTable(dados);
     updateGlobalData(dados);
     updateCurrentValues();
-    
+
     if (previousData) {
       updateTrendIndicators(state.estufaData, previousData);
     }
@@ -593,21 +599,21 @@ async function enviarChat() {
 
   addMessageToChat(mensagem, 'user');
   els.chatInput.value = "";
-  
+
   const thinking = showTypingIndicator();
-  
+
   els.chatInput.disabled = true;
   els.btnChat.disabled = true;
 
   try {
     const resposta = await fetch(`${API}/chat`, {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         mensagem: mensagem,
-        session_id: state.currentSessionId 
+        session_id: state.currentSessionId
       })
     });
 
@@ -616,17 +622,17 @@ async function enviarChat() {
     }
 
     const data = await resposta.json();
-    
+
     if (data.session_id) {
       state.currentSessionId = data.session_id;
     }
-    
+
     thinking.remove();
-    
+
     // Verificar se tem relatório para download
     if (data.tem_relatorio && data.url_download) {
       addMessageToChat(data.resposta, 'bot');
-      
+
       // Adicionar botão de download
       const downloadDiv = document.createElement('div');
       downloadDiv.className = 'download-section';
@@ -646,7 +652,7 @@ async function enviarChat() {
           </div>
         </div>
       `;
-      
+
       els.chatBox.appendChild(downloadDiv);
     } else {
       addMessageToChat(data.resposta, 'bot');
@@ -666,10 +672,10 @@ async function enviarChat() {
 function addMessageToChat(texto, tipo) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${tipo}-message`;
-  
-  const timestamp = new Date().toLocaleTimeString('pt-BR', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
+
+  const timestamp = new Date().toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit'
   });
 
   let conteudoHtml;
@@ -692,9 +698,9 @@ function addMessageToChat(texto, tipo) {
       </div>
     `;
   }
-  
+
   messageDiv.innerHTML = conteudoHtml;
-  
+
   els.chatBox.appendChild(messageDiv);
   els.chatBox.scrollTop = els.chatBox.scrollHeight;
 }
@@ -715,7 +721,7 @@ function showTypingIndicator() {
       </div>
     </div>
   `;
-  
+
   els.chatBox.appendChild(thinking);
   els.chatBox.scrollTop = els.chatBox.scrollHeight;
   return thinking;

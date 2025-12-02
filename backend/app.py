@@ -1188,7 +1188,7 @@ def analise():
     limit = int(request.args.get("limit", 20))
     try:
         if not system_ready:
-            return jsonify({})
+            return jsonify([])
 
         data = fetch_external_data("/registros", {"limit": limit})
         if data:
@@ -1211,11 +1211,11 @@ def analise():
         if data_cache['analise'] and data_cache['analise'].get('temperatura', {}).get('media', 0) > 0:
             return jsonify(data_cache['analise'])
         else:
-            return jsonify({})
+            return jsonify([])
 
     except Exception as e:
         print(f"DEBUG: Erro em /analise: {e}")
-        return jsonify({})
+        return jsonify([])
 
 @app.route("/dados_completos")
 def dados_completos():
